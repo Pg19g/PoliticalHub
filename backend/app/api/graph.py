@@ -8,6 +8,8 @@ import traceback
 import threading
 from flask import request, jsonify
 
+from flask import current_app
+
 from . import graph_bp
 from ..config import Config
 from ..services.ontology_generator import OntologyGenerator
@@ -282,16 +284,14 @@ def build_graph():
     try:
         logger.info("=== Starting graph build ===")
 
-        # Check configuration
-        errors = []
-        if not Config.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY is not configured")
-        if errors:
-            logger.error(f"Configuration errors: {errors}")
+        # Check Neo4j storage
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            logger.error("Neo4j storage not initialized")
             return jsonify({
                 "success": False,
-                "error": "Configuration errors: " + "; ".join(errors)
-            }), 500
+                "error": "Neo4j storage is not initialized"
+            }), 503
         
         # Parse request
         data = request.get_json() or {}
@@ -382,7 +382,7 @@ def build_graph():
                 )
                 
                 # Create graph build service
-                builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
+                builder = GraphBuilderService(storage=storage)
                 
                 # Chunking
                 task_manager.update_task(
@@ -400,7 +400,7 @@ def build_graph():
                 # Create graph
                 task_manager.update_task(
                     task_id,
-                    message="Creating Zep graph...",
+                    message="Creating graph...",
                     progress=10
                 )
                 graph_id = builder.create_graph(name=graph_name)
@@ -439,22 +439,8 @@ def build_graph():
                     progress_callback=add_progress_callback
                 )
                 
-                # Wait for Zep processing to complete (query each episode's processed status)
-                task_manager.update_task(
-                    task_id,
-                    message="Waiting for Zep to process data...",
-                    progress=55
-                )
-                
-                def wait_progress_callback(msg, progress_ratio):
-                    progress = 55 + int(progress_ratio * 35)  # 55% - 90%
-                    task_manager.update_task(
-                        task_id,
-                        message=msg,
-                        progress=progress
-                    )
-                
-                builder._wait_for_episodes(episode_uuids, wait_progress_callback)
+                # Wait for processing (no-op for Neo4j — synchronous)
+                storage.wait_for_processing(episode_uuids)
                 
                 # Get graph data
                 task_manager.update_task(
@@ -567,15 +553,16 @@ def get_graph_data(graph_id: str):
     Get graph data (nodes and edges)
     """
     try:
-        if not Config.ZEP_API_KEY:
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
             return jsonify({
                 "success": False,
-                "error": "ZEP_API_KEY is not configured"
-            }), 500
-        
-        builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
+                "error": "Neo4j storage is not initialized"
+            }), 503
+
+        builder = GraphBuilderService(storage=storage)
         graph_data = builder.get_graph_data(graph_id)
-        
+
         return jsonify({
             "success": True,
             "data": graph_data
@@ -592,16 +579,17 @@ def get_graph_data(graph_id: str):
 @graph_bp.route('/delete/<graph_id>', methods=['DELETE'])
 def delete_graph(graph_id: str):
     """
-    Delete Zep graph
+    Delete graph
     """
     try:
-        if not Config.ZEP_API_KEY:
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
             return jsonify({
                 "success": False,
-                "error": "ZEP_API_KEY is not configured"
-            }), 500
-        
-        builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
+                "error": "Neo4j storage is not initialized"
+            }), 503
+
+        builder = GraphBuilderService(storage=storage)
         builder.delete_graph(graph_id)
         
         return jsonify({

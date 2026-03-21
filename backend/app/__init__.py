@@ -41,7 +41,19 @@ def create_app(config_class=Config):
     
     # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})
-    
+
+    # --- Initialize Neo4jStorage singleton (DI via app.extensions) ---
+    from .storage import Neo4jStorage
+    try:
+        neo4j_storage = Neo4jStorage()
+        app.extensions['neo4j_storage'] = neo4j_storage
+        if should_log_startup:
+            logger.info("Neo4jStorage initialized (connected to %s)", Config.NEO4J_URI)
+    except Exception as e:
+        logger.error("Neo4jStorage initialization failed: %s", e)
+        # Store None so endpoints can return 503 gracefully
+        app.extensions['neo4j_storage'] = None
+
     # Register simulation process cleanup function (ensure all simulation processes are terminated when server shuts down)
     from .services.simulation_runner import SimulationRunner
     SimulationRunner.register_cleanup()

@@ -284,7 +284,7 @@ Based on the above content, design entity types and relationship types suitable 
             if len(edge.get("description", "")) > 100:
                 edge["description"] = edge["description"][:97] + "..."
 
-        # Zep API limit: max 10 custom entity types, max 10 custom edge types
+        # Limit: max 10 custom entity types, max 10 custom edge types
         MAX_ENTITY_TYPES = 10
         MAX_EDGE_TYPES = 10
 
@@ -346,13 +346,9 @@ Based on the above content, design entity types and relationship types suitable 
 
     def generate_python_code(self, ontology: Dict[str, Any]) -> str:
         """
-        Convert ontology definition to Python code (similar to ontology.py)
-
-        Args:
-            ontology: Ontology definition
-
-        Returns:
-            Python code string
+        [DEPRECATED] Convert ontology definition to Zep-format Pydantic code.
+        Not used in MiroShark (ontology stored as JSON in Neo4j).
+        Kept for reference only.
         """
         code_lines = [
             '"""',

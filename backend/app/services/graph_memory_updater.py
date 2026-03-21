@@ -1,6 +1,7 @@
 """
-Zep Graph Memory Update Service
-Dynamically updates Agent activities from simulations into the Zep graph
+Graph memory update service that processes agent activities and updates them to Neo4j Graph.
+
+Replaces zep_graph_memory_updater.py — Zep client replaced by GraphStorage.
 """
 
 import os
@@ -12,12 +13,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from queue import Queue, Empty
 
-from zep_cloud.client import Zep
-
 from ..config import Config
 from ..utils.logger import get_logger
+from ..storage import GraphStorage
 
-logger = get_logger('miroshark.zep_graph_memory_updater')
+logger = get_logger('miroshark.graph_memory_updater')
 
 
 @dataclass
@@ -33,12 +33,10 @@ class AgentActivity:
 
     def to_episode_text(self) -> str:
         """
-        Convert activity to text description that can be sent to Zep
+        Convert activity to natural language text description
 
-        Uses natural language description format so Zep can extract entities and relationships
-        Does not add simulation-related prefixes to avoid misleading graph updates
+        Use natural language description format so NER extractor can extract entities and relationships
         """
-        # Generate different descriptions based on action type
         action_descriptions = {
             "CREATE_POST": self._describe_create_post,
             "LIKE_POST": self._describe_like_post,
@@ -57,218 +55,174 @@ class AgentActivity:
         describe_func = action_descriptions.get(self.action_type, self._describe_generic)
         description = describe_func()
 
-        # Directly return "agent_name: activity_description" format, no simulation prefix
         return f"{self.agent_name}: {description}"
 
     def _describe_create_post(self) -> str:
         content = self.action_args.get("content", "")
         if content:
-            return f"published a post: \"{content}\""
-        return "published a post"
+            return f"Posted a post: \"{content}\""
+        return "Posted a post"
 
     def _describe_like_post(self) -> str:
-        """Like post - includes post content and author info"""
         post_content = self.action_args.get("post_content", "")
         post_author = self.action_args.get("post_author_name", "")
-
         if post_content and post_author:
-            return f"liked {post_author}'s post: \"{post_content}\""
+            return f"Liked {post_author}'s post: \"{post_content}\""
         elif post_content:
-            return f"liked a post: \"{post_content}\""
+            return f"Liked a post: \"{post_content}\""
         elif post_author:
-            return f"liked a post by {post_author}"
-        return "liked a post"
+            return f"Liked a post by {post_author}"
+        return "Liked a post"
 
     def _describe_dislike_post(self) -> str:
-        """Dislike post - includes post content and author info"""
         post_content = self.action_args.get("post_content", "")
         post_author = self.action_args.get("post_author_name", "")
-
         if post_content and post_author:
-            return f"disliked {post_author}'s post: \"{post_content}\""
+            return f"Disliked {post_author}'s post: \"{post_content}\""
         elif post_content:
-            return f"disliked a post: \"{post_content}\""
+            return f"Disliked a post: \"{post_content}\""
         elif post_author:
-            return f"disliked a post by {post_author}"
-        return "disliked a post"
+            return f"Disliked a post by {post_author}"
+        return "Disliked a post"
 
     def _describe_repost(self) -> str:
-        """Repost - includes original post content and author info"""
         original_content = self.action_args.get("original_content", "")
         original_author = self.action_args.get("original_author_name", "")
-
         if original_content and original_author:
-            return f"reposted {original_author}'s post: \"{original_content}\""
+            return f"Reposted {original_author}'s post: \"{original_content}\""
         elif original_content:
-            return f"reposted a post: \"{original_content}\""
+            return f"Reposted a post: \"{original_content}\""
         elif original_author:
-            return f"reposted a post by {original_author}"
-        return "reposted a post"
+            return f"Reposted a post by {original_author}"
+        return "Reposted a post"
 
     def _describe_quote_post(self) -> str:
-        """Quote post - includes original post content, author info and quote comment"""
         original_content = self.action_args.get("original_content", "")
         original_author = self.action_args.get("original_author_name", "")
         quote_content = self.action_args.get("quote_content", "") or self.action_args.get("content", "")
-
         base = ""
         if original_content and original_author:
-            base = f"quoted {original_author}'s post \"{original_content}\""
+            base = f"Quoted {original_author}'s post \"{original_content}\""
         elif original_content:
-            base = f"quoted a post \"{original_content}\""
+            base = f"Quoted a post \"{original_content}\""
         elif original_author:
-            base = f"quoted a post by {original_author}"
+            base = f"Quoted a post by {original_author}"
         else:
-            base = "quoted a post"
-
+            base = "Quoted a post"
         if quote_content:
-            base += f", and commented: \"{quote_content}\""
+            base += f", commented: \"{quote_content}\""
         return base
 
     def _describe_follow(self) -> str:
-        """Follow user - includes followed user's name"""
         target_user_name = self.action_args.get("target_user_name", "")
-
         if target_user_name:
-            return f"followed user \"{target_user_name}\""
-        return "followed a user"
+            return f"Followed user \"{target_user_name}\""
+        return "Followed a user"
 
     def _describe_create_comment(self) -> str:
-        """Create comment - includes comment content and commented post info"""
         content = self.action_args.get("content", "")
         post_content = self.action_args.get("post_content", "")
         post_author = self.action_args.get("post_author_name", "")
-
         if content:
             if post_content and post_author:
-                return f"commented on {post_author}'s post \"{post_content}\": \"{content}\""
+                return f"Commented on {post_author}'s post \"{post_content}\": \"{content}\""
             elif post_content:
-                return f"commented on post \"{post_content}\": \"{content}\""
+                return f"Commented on post \"{post_content}\": \"{content}\""
             elif post_author:
-                return f"commented on {post_author}'s post: \"{content}\""
-            return f"commented: \"{content}\""
-        return "posted a comment"
+                return f"Commented on {post_author}'s post: \"{content}\""
+            return f"Commented: \"{content}\""
+        return "Left a comment"
 
     def _describe_like_comment(self) -> str:
-        """Like comment - includes comment content and author info"""
         comment_content = self.action_args.get("comment_content", "")
         comment_author = self.action_args.get("comment_author_name", "")
-
         if comment_content and comment_author:
-            return f"liked {comment_author}'s comment: \"{comment_content}\""
+            return f"Liked {comment_author}'s comment: \"{comment_content}\""
         elif comment_content:
-            return f"liked a comment: \"{comment_content}\""
+            return f"Liked a comment: \"{comment_content}\""
         elif comment_author:
-            return f"liked a comment by {comment_author}"
-        return "liked a comment"
+            return f"Liked a comment by {comment_author}"
+        return "Liked a comment"
 
     def _describe_dislike_comment(self) -> str:
-        """Dislike comment - includes comment content and author info"""
         comment_content = self.action_args.get("comment_content", "")
         comment_author = self.action_args.get("comment_author_name", "")
-
         if comment_content and comment_author:
-            return f"disliked {comment_author}'s comment: \"{comment_content}\""
+            return f"Disliked {comment_author}'s comment: \"{comment_content}\""
         elif comment_content:
-            return f"disliked a comment: \"{comment_content}\""
+            return f"Disliked a comment: \"{comment_content}\""
         elif comment_author:
-            return f"disliked a comment by {comment_author}"
-        return "disliked a comment"
+            return f"Disliked a comment by {comment_author}"
+        return "Disliked a comment"
 
     def _describe_search(self) -> str:
-        """Search posts - includes search keywords"""
         query = self.action_args.get("query", "") or self.action_args.get("keyword", "")
-        return f"searched for \"{query}\"" if query else "performed a search"
+        return f"Searched for \"{query}\""if query else "Performed a search"
 
     def _describe_search_user(self) -> str:
-        """Search users - includes search keywords"""
         query = self.action_args.get("query", "") or self.action_args.get("username", "")
-        return f"searched for user \"{query}\"" if query else "searched for users"
+        return f"Searched for user \"{query}\""if query else "Searched for user"
 
     def _describe_mute(self) -> str:
-        """Mute user - includes muted user's name"""
         target_user_name = self.action_args.get("target_user_name", "")
-
         if target_user_name:
-            return f"muted user \"{target_user_name}\""
-        return "muted a user"
+            return f"Muted user \"{target_user_name}\""
+        return "Muted a user"
 
     def _describe_generic(self) -> str:
-        # For unknown action types, generate a generic description
-        return f"performed {self.action_type} action"
+        return f"Executed {self.action_type} action"
 
 
-class ZepGraphMemoryUpdater:
+class GraphMemoryUpdater:
     """
-    Zep Graph Memory Updater
+    Graph memory update service (via GraphStorage / Neo4j)
 
-    Monitors simulation action log files and updates new agent activities to the Zep graph in real-time.
-    Groups by platform, batch sends to Zep after accumulating BATCH_SIZE activities.
-
-    All meaningful actions are updated to Zep, with action_args containing full context info:
-    - Original post text for likes/dislikes
-    - Original post text for reposts/quotes
-    - Usernames for follows/mutes
-    - Original comment text for comment likes/dislikes
+    Monitors simulation action logs and sends agent activities to the graph in real-time.
+    Batches activities by platform, accumulating BATCH_SIZE activities before sending each batch.
     """
 
-    # Batch send size (how many activities to accumulate per platform before sending)
     BATCH_SIZE = 5
 
-    # Platform name mapping (for console display)
     PLATFORM_DISPLAY_NAMES = {
-        'twitter': 'World1',
-        'reddit': 'World2',
+        'twitter': 'worldinterface1',
+        'reddit': 'worldinterface2',
     }
 
-    # Send interval (seconds), to avoid sending too fast
     SEND_INTERVAL = 0.5
-
-    # Retry configuration
     MAX_RETRIES = 3
-    RETRY_DELAY = 2  # seconds
+    RETRY_DELAY = 2
 
-    def __init__(self, graph_id: str, api_key: Optional[str] = None):
+    def __init__(self, graph_id: str, storage: GraphStorage):
         """
-        Initialize updater
+        InitializeUpdatedevice
 
         Args:
-            graph_id: Zep graph ID
-            api_key: Zep API Key (optional, defaults to reading from config)
+            graph_id: GraphID
+            storage: GraphStorage instance (injected)
         """
         self.graph_id = graph_id
-        self.api_key = api_key or Config.ZEP_API_KEY
+        self.storage = storage
 
-        if not self.api_key:
-            raise ValueError("ZEP_API_KEY is not configured")
-
-        self.client = Zep(api_key=self.api_key)
-
-        # Activity queue
         self._activity_queue: Queue = Queue()
 
-        # Per-platform activity buffers (each platform accumulates to BATCH_SIZE before batch sending)
         self._platform_buffers: Dict[str, List[AgentActivity]] = {
             'twitter': [],
             'reddit': [],
         }
         self._buffer_lock = threading.Lock()
 
-        # Control flags
         self._running = False
         self._worker_thread: Optional[threading.Thread] = None
 
-        # Statistics
-        self._total_activities = 0  # Total activities added to queue
-        self._total_sent = 0        # Batches successfully sent to Zep
-        self._total_items_sent = 0  # Activity items successfully sent to Zep
-        self._failed_count = 0      # Failed batch count
-        self._skipped_count = 0     # Activities filtered and skipped (DO_NOTHING)
+        self._total_activities = 0
+        self._total_sent = 0
+        self._total_items_sent = 0
+        self._failed_count = 0
+        self._skipped_count = 0
 
-        logger.info(f"ZepGraphMemoryUpdater initialized: graph_id={graph_id}, batch_size={self.BATCH_SIZE}")
+        logger.info(f"GraphMemoryUpdater initialized: graph_id={graph_id}, batch_size={self.BATCH_SIZE}")
 
     def _get_platform_display_name(self, platform: str) -> str:
-        """Get display name for platform"""
         return self.PLATFORM_DISPLAY_NAMES.get(platform.lower(), platform)
 
     def start(self):
@@ -280,67 +234,39 @@ class ZepGraphMemoryUpdater:
         self._worker_thread = threading.Thread(
             target=self._worker_loop,
             daemon=True,
-            name=f"ZepMemoryUpdater-{self.graph_id[:8]}"
+            name=f"GraphMemoryUpdater-{self.graph_id[:8]}"
         )
         self._worker_thread.start()
-        logger.info(f"ZepGraphMemoryUpdater started: graph_id={self.graph_id}")
+        logger.info(f"GraphMemoryUpdater started: graph_id={self.graph_id}")
 
     def stop(self):
         """Stop background worker thread"""
         self._running = False
 
-        # Send remaining activities
         self._flush_remaining()
 
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=10)
 
-        logger.info(f"ZepGraphMemoryUpdater stopped: graph_id={self.graph_id}, "
-                   f"total_activities={self._total_activities}, "
-                   f"batches_sent={self._total_sent}, "
-                   f"items_sent={self._total_items_sent}, "
-                   f"failed={self._failed_count}, "
-                   f"skipped={self._skipped_count}")
+        logger.info(f"GraphMemoryUpdater stopped: graph_id={self.graph_id}, "
+                     f"total_activities={self._total_activities}, "
+                     f"batches_sent={self._total_sent}, "
+                     f"items_sent={self._total_items_sent}, "
+                     f"failed={self._failed_count}, "
+                     f"skipped={self._skipped_count}")
 
     def add_activity(self, activity: AgentActivity):
-        """
-        Add an agent activity to the queue
-
-        All meaningful actions are added to the queue, including:
-        - CREATE_POST (create post)
-        - CREATE_COMMENT (comment)
-        - QUOTE_POST (quote post)
-        - SEARCH_POSTS (search posts)
-        - SEARCH_USER (search users)
-        - LIKE_POST/DISLIKE_POST (like/dislike post)
-        - REPOST (repost)
-        - FOLLOW (follow)
-        - MUTE (mute)
-        - LIKE_COMMENT/DISLIKE_COMMENT (like/dislike comment)
-
-        action_args will contain full context info (e.g. original post text, usernames, etc.).
-
-        Args:
-            activity: Agent activity record
-        """
-        # Skip DO_NOTHING type activities
+        """Add an agent activity to queue"""
         if activity.action_type == "DO_NOTHING":
             self._skipped_count += 1
             return
 
         self._activity_queue.put(activity)
         self._total_activities += 1
-        logger.debug(f"Added activity to Zep queue: {activity.agent_name} - {activity.action_type}")
+        logger.debug(f"Add activity to queue: {activity.agent_name} - {activity.action_type}")
 
     def add_activity_from_dict(self, data: Dict[str, Any], platform: str):
-        """
-        Add activity from dict data
-
-        Args:
-            data: Dict data parsed from actions.jsonl
-            platform: Platform name (twitter/reddit)
-        """
-        # Skip event type entries
+        """Add activity from dict data"""
         if "event_type" in data:
             return
 
@@ -357,27 +283,22 @@ class ZepGraphMemoryUpdater:
         self.add_activity(activity)
 
     def _worker_loop(self):
-        """Background work loop - batch send activities to Zep by platform"""
+        """Background worker loop - batch send activities to graph by platform"""
         while self._running or not self._activity_queue.empty():
             try:
-                # Try to get activity from queue (1 second timeout)
                 try:
                     activity = self._activity_queue.get(timeout=1)
 
-                    # Add activity to the corresponding platform buffer
                     platform = activity.platform.lower()
                     with self._buffer_lock:
                         if platform not in self._platform_buffers:
                             self._platform_buffers[platform] = []
                         self._platform_buffers[platform].append(activity)
 
-                        # Check if this platform has reached batch size
                         if len(self._platform_buffers[platform]) >= self.BATCH_SIZE:
                             batch = self._platform_buffers[platform][:self.BATCH_SIZE]
                             self._platform_buffers[platform] = self._platform_buffers[platform][self.BATCH_SIZE:]
-                            # Send after releasing lock
                             self._send_batch_activities(batch, platform)
-                            # Send interval to avoid sending too fast
                             time.sleep(self.SEND_INTERVAL)
 
                 except Empty:
@@ -389,46 +310,35 @@ class ZepGraphMemoryUpdater:
 
     def _send_batch_activities(self, activities: List[AgentActivity], platform: str):
         """
-        Batch send activities to Zep graph (merged into a single text)
-
-        Args:
-            activities: Agent activity list
-            platform: Platform name
+        Send batched activities to the graph by merging them as text and using add_text to trigger NER.
         """
         if not activities:
             return
 
-        # Merge multiple activities into a single text, separated by newlines
         episode_texts = [activity.to_episode_text() for activity in activities]
         combined_text = "\n".join(episode_texts)
 
-        # Send with retry
         for attempt in range(self.MAX_RETRIES):
             try:
-                self.client.graph.add(
-                    graph_id=self.graph_id,
-                    type="text",
-                    data=combined_text
-                )
+                self.storage.add_text(self.graph_id, combined_text)
 
                 self._total_sent += 1
                 self._total_items_sent += len(activities)
                 display_name = self._get_platform_display_name(platform)
                 logger.info(f"Successfully batch sent {len(activities)} {display_name} activities to graph {self.graph_id}")
-                logger.debug(f"Batch content preview: {combined_text[:200]}...")
+                logger.debug(f"Batch preview: {combined_text[:200]}...")
                 return
 
             except Exception as e:
                 if attempt < self.MAX_RETRIES - 1:
-                    logger.warning(f"Batch send to Zep failed (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}")
+                    logger.warning(f"Batch send to graph failed (attempt {attempt + 1}/{self.MAX_RETRIES}): {e}")
                     time.sleep(self.RETRY_DELAY * (attempt + 1))
                 else:
-                    logger.error(f"Batch send to Zep failed after {self.MAX_RETRIES} retries: {e}")
+                    logger.error(f"Batch send to graph failed after {self.MAX_RETRIES} retries: {e}")
                     self._failed_count += 1
 
     def _flush_remaining(self):
         """Send remaining activities in queue and buffers"""
-        # First process remaining activities in queue, add to buffers
         while not self._activity_queue.empty():
             try:
                 activity = self._activity_queue.get_nowait()
@@ -440,14 +350,12 @@ class ZepGraphMemoryUpdater:
             except Empty:
                 break
 
-        # Then send remaining activities in each platform buffer (even if less than BATCH_SIZE)
         with self._buffer_lock:
             for platform, buffer in self._platform_buffers.items():
                 if buffer:
                     display_name = self._get_platform_display_name(platform)
-                    logger.info(f"Sending remaining {len(buffer)} {display_name} platform activities")
+                    logger.info(f"Send remaining {len(buffer)} {display_name} platform activities")
                     self._send_batch_activities(buffer, platform)
-            # Clear all buffers
             for platform in self._platform_buffers:
                 self._platform_buffers[platform] = []
 
@@ -459,72 +367,70 @@ class ZepGraphMemoryUpdater:
         return {
             "graph_id": self.graph_id,
             "batch_size": self.BATCH_SIZE,
-            "total_activities": self._total_activities,  # Total activities added to queue
-            "batches_sent": self._total_sent,            # Batches successfully sent
-            "items_sent": self._total_items_sent,        # Activity items successfully sent
-            "failed_count": self._failed_count,          # Failed batch count
-            "skipped_count": self._skipped_count,        # Filtered/skipped activities (DO_NOTHING)
+            "total_activities": self._total_activities,
+            "batches_sent": self._total_sent,
+            "items_sent": self._total_items_sent,
+            "failed_count": self._failed_count,
+            "skipped_count": self._skipped_count,
             "queue_size": self._activity_queue.qsize(),
-            "buffer_sizes": buffer_sizes,                # Per-platform buffer sizes
+            "buffer_sizes": buffer_sizes,
             "running": self._running,
         }
 
 
-class ZepGraphMemoryManager:
+class GraphMemoryManager:
     """
-    Manages Zep graph memory updaters for multiple simulations
+    Manages graph memory updaters for multiple simulations.
 
-    Each simulation can have its own updater instance
+    Each simulation can have its own independent updater instance.
+    NOTE: create_updater() requires a GraphStorage instance — must be passed in.
     """
 
-    _updaters: Dict[str, ZepGraphMemoryUpdater] = {}
+    _updaters: Dict[str, GraphMemoryUpdater] = {}
     _lock = threading.Lock()
 
     @classmethod
-    def create_updater(cls, simulation_id: str, graph_id: str) -> ZepGraphMemoryUpdater:
+    def create_updater(
+        cls, simulation_id: str, graph_id: str, storage: GraphStorage
+    ) -> GraphMemoryUpdater:
         """
-        Create graph memory updater for a simulation
+        Create a graph memory updater for a simulation.
 
         Args:
             simulation_id: Simulation ID
-            graph_id: Zep graph ID
-
-        Returns:
-            ZepGraphMemoryUpdater instance
+            graph_id: Graph ID
+            storage: GraphStorage instance
         """
         with cls._lock:
-            # If already exists, stop the old one first
             if simulation_id in cls._updaters:
                 cls._updaters[simulation_id].stop()
 
-            updater = ZepGraphMemoryUpdater(graph_id)
+            updater = GraphMemoryUpdater(graph_id, storage)
             updater.start()
             cls._updaters[simulation_id] = updater
 
-            logger.info(f"Created graph memory updater: simulation_id={simulation_id}, graph_id={graph_id}")
+            logger.info(f"Create graph memory updater: simulation_id={simulation_id}, graph_id={graph_id}")
             return updater
 
     @classmethod
-    def get_updater(cls, simulation_id: str) -> Optional[ZepGraphMemoryUpdater]:
-        """Get updater for a simulation"""
+    def get_updater(cls, simulation_id: str) -> Optional[GraphMemoryUpdater]:
+        """Get updater for simulation"""
         return cls._updaters.get(simulation_id)
 
     @classmethod
     def stop_updater(cls, simulation_id: str):
-        """Stop and remove updater for a simulation"""
+        """Stop and remove updater for simulation"""
         with cls._lock:
             if simulation_id in cls._updaters:
                 cls._updaters[simulation_id].stop()
                 del cls._updaters[simulation_id]
                 logger.info(f"Stopped graph memory updater: simulation_id={simulation_id}")
 
-    # Flag to prevent duplicate stop_all calls
     _stop_all_done = False
 
     @classmethod
     def stop_all(cls):
         """Stop all updaters"""
-        # Prevent duplicate calls
         if cls._stop_all_done:
             return
         cls._stop_all_done = True
@@ -537,7 +443,7 @@ class ZepGraphMemoryManager:
                     except Exception as e:
                         logger.error(f"Failed to stop updater: simulation_id={simulation_id}, error={e}")
                 cls._updaters.clear()
-            logger.info("All graph memory updaters stopped")
+            logger.info("Stopped all graph memory updaters")
 
     @classmethod
     def get_all_stats(cls) -> Dict[str, Dict[str, Any]]:

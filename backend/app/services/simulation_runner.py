@@ -20,7 +20,7 @@ from queue import Queue
 
 from ..config import Config
 from ..utils.logger import get_logger
-from .zep_graph_memory_updater import ZepGraphMemoryManager
+from .graph_memory_updater import GraphMemoryManager
 from .simulation_ipc import SimulationIPCClient, CommandType, IPCResponse
 
 logger = get_logger('miroshark.simulation_runner')
@@ -314,8 +314,9 @@ class SimulationRunner:
         simulation_id: str,
         platform: str = "parallel",  # twitter / reddit / parallel
         max_rounds: int = None,  # Max simulation rounds (optional, to truncate overly long simulations)
-        enable_graph_memory_update: bool = False,  # Whether to update activities to Zep graph
-        graph_id: str = None  # Zep graph ID (required when graph update is enabled)
+        enable_graph_memory_update: bool = False,  # Whether to update activities to knowledge graph
+        graph_id: str = None,  # Graph ID (required when graph update is enabled)
+        storage: 'GraphStorage' = None  # GraphStorage instance (required if enable_graph_memory_update)
     ) -> SimulationRunState:
         """
         Start simulation
@@ -324,8 +325,8 @@ class SimulationRunner:
             simulation_id: Simulation ID
             platform: Run platform (twitter/reddit/parallel)
             max_rounds: Max simulation rounds (optional, to truncate overly long simulations)
-            enable_graph_memory_update: Whether to dynamically update Agent activities to Zep graph
-            graph_id: Zep graph ID (required when graph update is enabled)
+            enable_graph_memory_update: Whether to dynamically update Agent activities to graph
+            graph_id: Graph ID (required when graph update is enabled)
             
         Returns:
             SimulationRunState
@@ -374,7 +375,9 @@ class SimulationRunner:
                 raise ValueError("graph_id is required when graph memory update is enabled")
             
             try:
-                ZepGraphMemoryManager.create_updater(simulation_id, graph_id)
+                if not storage:
+                    raise ValueError("Must provide storage (GraphStorage) when enabling graph memory update")
+                GraphMemoryManager.create_updater(simulation_id, graph_id, storage)
                 cls._graph_memory_enabled[simulation_id] = True
                 logger.info(f"Graph memory update enabled: simulation_id={simulation_id}, graph_id={graph_id}")
             except Exception as e:
@@ -551,7 +554,7 @@ class SimulationRunner:
             # Stop graph memory updater
             if cls._graph_memory_enabled.get(simulation_id, False):
                 try:
-                    ZepGraphMemoryManager.stop_updater(simulation_id)
+                    GraphMemoryManager.stop_updater(simulation_id)
                     logger.info(f"Stopped graph memory update: simulation_id={simulation_id}")
                 except Exception as e:
                     logger.error(f"Failed to stop graph memory updater: {e}")
@@ -599,7 +602,7 @@ class SimulationRunner:
         graph_memory_enabled = cls._graph_memory_enabled.get(state.simulation_id, False)
         graph_updater = None
         if graph_memory_enabled:
-            graph_updater = ZepGraphMemoryManager.get_updater(state.simulation_id)
+            graph_updater = GraphMemoryManager.get_updater(state.simulation_id)
         
         try:
             with open(log_path, 'r', encoding='utf-8') as f:
@@ -674,7 +677,7 @@ class SimulationRunner:
                             if action.round_num and action.round_num > state.current_round:
                                 state.current_round = action.round_num
                             
-                            # If graph memory update is enabled, send activity to Zep
+                            # If graph memory update is enabled, send activity to graph
                             if graph_updater:
                                 graph_updater.add_activity_from_dict(action_data, platform)
                             
@@ -807,7 +810,7 @@ class SimulationRunner:
         # Stop graph memory updater
         if cls._graph_memory_enabled.get(simulation_id, False):
             try:
-                ZepGraphMemoryManager.stop_updater(simulation_id)
+                GraphMemoryManager.stop_updater(simulation_id)
                 logger.info(f"Stopped graph memory update: simulation_id={simulation_id}")
             except Exception as e:
                 logger.error(f"Failed to stop graph memory updater: {e}")
@@ -1201,7 +1204,7 @@ class SimulationRunner:
         
         # First stop all graph memory updaters (stop_all prints logs internally)
         try:
-            ZepGraphMemoryManager.stop_all()
+            GraphMemoryManager.stop_all()
         except Exception as e:
             logger.error(f"Failed to stop graph memory updater: {e}")
         cls._graph_memory_enabled.clear()

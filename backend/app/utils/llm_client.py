@@ -4,6 +4,7 @@ Unified API calls using OpenAI format
 """
 
 import json
+import os
 import re
 from typing import Optional, Dict, Any, List
 from openai import OpenAI
@@ -18,19 +19,28 @@ class LLMClient:
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        timeout: float = 300.0
     ):
         self.api_key = api_key or Config.LLM_API_KEY
         self.base_url = base_url or Config.LLM_BASE_URL
         self.model = model or Config.LLM_MODEL_NAME
-        
+
         if not self.api_key:
             raise ValueError("LLM_API_KEY is not configured")
-        
+
         self.client = OpenAI(
             api_key=self.api_key,
-            base_url=self.base_url
+            base_url=self.base_url,
+            timeout=timeout,
         )
+
+        # Ollama context window size — prevents prompt truncation.
+        self._num_ctx = int(os.environ.get('OLLAMA_NUM_CTX', '8192'))
+
+    def _is_ollama(self) -> bool:
+        """Check if we're talking to an Ollama server."""
+        return '11434' in (self.base_url or '')
     
     def chat(
         self,
@@ -60,7 +70,13 @@ class LLMClient:
         
         if response_format:
             kwargs["response_format"] = response_format
-        
+
+        # For Ollama: pass num_ctx via extra_body to prevent prompt truncation
+        if self._is_ollama() and self._num_ctx:
+            kwargs["extra_body"] = {
+                "options": {"num_ctx": self._num_ctx}
+            }
+
         response = self.client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content
         # Some models (e.g., MiniMax M2.5) include <think> reasoning content in the content field, which needs to be removed

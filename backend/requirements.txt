@@ -13,8 +13,12 @@ flask-cors>=6.0.0
 # OpenAI SDK (unified LLM calls using OpenAI format)
 openai>=1.0.0
 
-# ============= Zep Cloud =============
-zep-cloud==3.13.0
+# ============= Neo4j =============
+neo4j>=5.15.0
+
+# ============= HTTP Requests =============
+# For Ollama embedding API
+requests>=2.31.0
 
 # ============= OASIS Social Media Simulation =============
 # OASIS social simulation framework

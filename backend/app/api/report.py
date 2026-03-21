@@ -6,11 +6,12 @@ Provides simulation report generation, retrieval, and conversation endpoints
 import os
 import traceback
 import threading
-from flask import request, jsonify, send_file
+from flask import request, jsonify, send_file, current_app
 
 from . import report_bp
 from ..config import Config
 from ..services.report_agent import ReportAgent, ReportManager, ReportStatus
+from ..services.graph_tools import GraphToolsService
 from ..services.simulation_manager import SimulationManager
 from ..models.project import ProjectManager
 from ..models.task import TaskManager, TaskStatus
@@ -120,6 +121,13 @@ def generate_report():
             }
         )
 
+        # Initialize graph_tools in Flask context BEFORE spawning thread
+        # (current_app is not available inside background threads)
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            return jsonify({"success": False, "error": "Neo4j storage not initialized"}), 503
+        graph_tools = GraphToolsService(storage=storage)
+
         # Define background task
         def run_generate():
             try:
@@ -134,7 +142,8 @@ def generate_report():
                 agent = ReportAgent(
                     graph_id=graph_id,
                     simulation_id=simulation_id,
-                    simulation_requirement=simulation_requirement
+                    simulation_requirement=simulation_requirement,
+                    graph_tools=graph_tools
                 )
 
                 # Progress callback
@@ -537,10 +546,16 @@ def chat_with_report_agent():
         simulation_requirement = project.simulation_requirement or ""
 
         # Create Agent and start conversation
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            return jsonify({"success": False, "error": "Neo4j storage not initialized"}), 503
+        graph_tools = GraphToolsService(storage=storage)
+
         agent = ReportAgent(
             graph_id=graph_id,
             simulation_id=simulation_id,
-            simulation_requirement=simulation_requirement
+            simulation_requirement=simulation_requirement,
+            graph_tools=graph_tools
         )
 
         result = agent.chat(message=message, chat_history=chat_history)
@@ -952,9 +967,14 @@ def search_graph_tool():
                 "error": "Please provide graph_id and query"
             }), 400
 
-        from ..services.zep_tools import ZepToolsService
+        from flask import current_app
+        from ..services.graph_tools import GraphToolsService
 
-        tools = ZepToolsService()
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            return jsonify({"success": False, "error": "Neo4j storage is not initialized"}), 503
+
+        tools = GraphToolsService(storage=storage)
         result = tools.search_graph(
             graph_id=graph_id,
             query=query,
@@ -996,9 +1016,14 @@ def get_graph_statistics_tool():
                 "error": "Please provide graph_id"
             }), 400
 
-        from ..services.zep_tools import ZepToolsService
+        from flask import current_app
+        from ..services.graph_tools import GraphToolsService
 
-        tools = ZepToolsService()
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            return jsonify({"success": False, "error": "Neo4j storage is not initialized"}), 503
+
+        tools = GraphToolsService(storage=storage)
         result = tools.get_graph_statistics(graph_id)
 
         return jsonify({

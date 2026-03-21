@@ -122,7 +122,7 @@
         <div class="card-content">
           <p class="api-note">POST /api/graph/build</p>
           <p class="description">
-            Based on the generated ontology, automatically chunks documents and calls Zep to build a knowledge graph, extracting entities and relationships, forming temporal memory and community summaries
+            Based on the generated ontology, automatically chunks documents and builds a knowledge graph via Neo4j, extracting entities and relationships, forming temporal memory and community summaries
           </p>
 
           <!-- Stats Cards -->

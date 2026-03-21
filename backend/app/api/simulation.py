@@ -1,15 +1,15 @@
 """
 Simulation-related API routes
-Step 2: Zep entity reading and filtering, OASIS simulation preparation and execution (fully automated)
+Step 2: Entity reading and filtering, OASIS simulation preparation and execution (fully automated)
 """
 
 import os
 import traceback
-from flask import request, jsonify, send_file
+from flask import request, jsonify, send_file, current_app
 
 from . import simulation_bp
 from ..config import Config
-from ..services.zep_entity_reader import ZepEntityReader
+from ..services.entity_reader import EntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
@@ -56,19 +56,16 @@ def get_graph_entities(graph_id: str):
         enrich: Whether to include related edge information (default true)
     """
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": "ZEP_API_KEY is not configured"
-            }), 500
-        
         entity_types_str = request.args.get('entity_types', '')
         entity_types = [t.strip() for t in entity_types_str.split(',') if t.strip()] if entity_types_str else None
         enrich = request.args.get('enrich', 'true').lower() == 'true'
-        
+
         logger.info(f"Fetching graph entities: graph_id={graph_id}, entity_types={entity_types}, enrich={enrich}")
-        
-        reader = ZepEntityReader()
+
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            raise ValueError("GraphStorage not initialized")
+        reader = EntityReader(storage)
         result = reader.filter_defined_entities(
             graph_id=graph_id,
             defined_entity_types=entity_types,
@@ -93,13 +90,10 @@ def get_graph_entities(graph_id: str):
 def get_entity_detail(graph_id: str, entity_uuid: str):
     """Get detailed information for a single entity"""
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": "ZEP_API_KEY is not configured"
-            }), 500
-        
-        reader = ZepEntityReader()
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            raise ValueError("GraphStorage not initialized")
+        reader = EntityReader(storage)
         entity = reader.get_entity_with_context(graph_id, entity_uuid)
         
         if not entity:
@@ -126,15 +120,12 @@ def get_entity_detail(graph_id: str, entity_uuid: str):
 def get_entities_by_type(graph_id: str, entity_type: str):
     """Get all entities of a specified type"""
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": "ZEP_API_KEY is not configured"
-            }), 500
-        
         enrich = request.args.get('enrich', 'true').lower() == 'true'
-        
-        reader = ZepEntityReader()
+
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            raise ValueError("GraphStorage not initialized")
+        reader = EntityReader(storage)
         entities = reader.get_entities_by_type(
             graph_id=graph_id,
             entity_type=entity_type,
@@ -370,7 +361,7 @@ def prepare_simulation():
 
     Steps:
     1. Check if preparation work has already been completed
-    2. Read and filter entities from Zep graph
+    2. Read and filter entities from knowledge graph
     3. Generate OASIS Agent Profile for each entity (with retry mechanism)
     4. LLM intelligently generates simulation configuration (with retry mechanism)
     5. Save configuration files and preset scripts
@@ -467,11 +458,16 @@ def prepare_simulation():
         use_llm_for_profiles = data.get('use_llm_for_profiles', True)
         parallel_profile_count = data.get('parallel_profile_count', 5)
         
+        # ========== Get GraphStorage (capture reference before background task starts) ==========
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            raise ValueError("GraphStorage not initialized — check Neo4j connection")
+
         # ========== Synchronously get entity count (before background task starts) ==========
         # This allows the frontend to get the expected total Agent count immediately after calling prepare
         try:
             logger.info(f"Synchronously fetching entity count: graph_id={state.graph_id}")
-            reader = ZepEntityReader()
+            reader = EntityReader(storage)
             # Quick entity read (no edge info needed, just counting)
             filtered_preview = reader.filter_defined_entities(
                 graph_id=state.graph_id,
@@ -582,7 +578,8 @@ def prepare_simulation():
                     defined_entity_types=entity_types_list,
                     use_llm_for_profiles=use_llm_for_profiles,
                     progress_callback=progress_callback,
-                    parallel_profile_count=parallel_profile_count
+                    parallel_profile_count=parallel_profile_count,
+                    storage=storage
                 )
                 
                 # Task complete
@@ -1395,8 +1392,11 @@ def generate_profiles():
         entity_types = data.get('entity_types')
         use_llm = data.get('use_llm', True)
         platform = data.get('platform', 'reddit')
-        
-        reader = ZepEntityReader()
+
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            raise ValueError("GraphStorage not initialized")
+        reader = EntityReader(storage)
         filtered = reader.filter_defined_entities(
             graph_id=graph_id,
             defined_entity_types=entity_types,
@@ -1453,7 +1453,7 @@ def start_simulation():
             "simulation_id": "sim_xxxx",          // Required, simulation ID
             "platform": "parallel",                // Optional: twitter / reddit / parallel (default)
             "max_rounds": 100,                     // Optional: maximum simulation rounds, used to truncate overly long simulations
-            "enable_graph_memory_update": false,   // Optional: whether to dynamically update agent activity to Zep graph memory
+            "enable_graph_memory_update": false,   // Optional: whether to dynamically update agent activity to knowledge graph memory
             "force": false                         // Optional: force restart (will stop running simulation and clean up logs)
         }
 
@@ -1464,7 +1464,7 @@ def start_simulation():
         - Suitable for scenarios requiring simulation re-run
 
     About enable_graph_memory_update:
-        - When enabled, all agent activities during simulation (posting, commenting, liking, etc.) will be updated to Zep graph in real-time
+        - When enabled, all agent activities during simulation (posting, commenting, liking, etc.) will be updated to knowledge graph in real-time
         - This allows the graph to "remember" the simulation process, for subsequent analysis or AI conversation
         - Requires the associated project to have a valid graph_id
         - Uses batch update mechanism to reduce API call frequency
@@ -1595,13 +1595,19 @@ def start_simulation():
             
             logger.info(f"Enable graph memory update: simulation_id={simulation_id}, graph_id={graph_id}")
         
+        # Get storage for graph memory update if enabled
+        sim_storage = None
+        if enable_graph_memory_update:
+            sim_storage = current_app.extensions.get('neo4j_storage')
+
         # Start simulation
         run_state = SimulationRunner.start_simulation(
             simulation_id=simulation_id,
             platform=platform,
             max_rounds=max_rounds,
             enable_graph_memory_update=enable_graph_memory_update,
-            graph_id=graph_id
+            graph_id=graph_id,
+            storage=sim_storage
         )
         
         # Update simulation status

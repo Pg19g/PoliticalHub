@@ -14,7 +14,7 @@ from enum import Enum
 
 from ..config import Config
 from ..utils.logger import get_logger
-from .zep_entity_reader import ZepEntityReader, FilteredEntities
+from .entity_reader import EntityReader, FilteredEntities
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
 
@@ -116,7 +116,7 @@ class SimulationManager:
     Simulation Manager
 
     Core features:
-    1. Read and filter entities from Zep graph
+    1. Read entities from graph and filter
     2. Generate OASIS Agent Profiles
     3. Use LLM to intelligently generate simulation configuration parameters
     4. Prepare all files needed by preset scripts
@@ -202,7 +202,7 @@ class SimulationManager:
 
         Args:
             project_id: Project ID
-            graph_id: Zep graph ID
+            graph_id: Graph ID
             enable_twitter: Whether to enable Twitter simulation
             enable_reddit: Whether to enable Reddit simulation
 
@@ -234,13 +234,14 @@ class SimulationManager:
         defined_entity_types: Optional[List[str]] = None,
         use_llm_for_profiles: bool = True,
         progress_callback: Optional[callable] = None,
-        parallel_profile_count: int = 3
+        parallel_profile_count: int = 3,
+        storage: 'GraphStorage' = None,
     ) -> SimulationState:
         """
         Prepare simulation environment (fully automated)
 
         Steps:
-        1. Read and filter entities from Zep graph
+        1. Read and filter entities from graph
         2. Generate OASIS Agent Profile for each entity (optional LLM enhancement, supports parallelism)
         3. Use LLM to intelligently generate simulation config parameters (time, activity, posting frequency, etc.)
         4. Save config files and Profile files
@@ -270,9 +271,11 @@ class SimulationManager:
 
             # ========== Phase 1: Read and filter entities ==========
             if progress_callback:
-                progress_callback("reading", 0, "Connecting to Zep graph...")
+                progress_callback("reading", 0, "Connecting to graph...")
 
-            reader = ZepEntityReader()
+            if not storage:
+                raise ValueError("storage (GraphStorage) is required for prepare_simulation")
+            reader = EntityReader(storage)
 
             if progress_callback:
                 progress_callback("reading", 30, "Reading node data...")
@@ -311,8 +314,8 @@ class SimulationManager:
                     total=total_entities
                 )
 
-            # Pass graph_id to enable Zep retrieval for richer context
-            generator = OasisProfileGenerator(graph_id=state.graph_id)
+            # Pass graph_id to enable graph retrieval for richer context
+            generator = OasisProfileGenerator(storage=storage, graph_id=state.graph_id)
             
             def profile_progress(current, total, msg):
                 if progress_callback:
@@ -339,7 +342,7 @@ class SimulationManager:
                 entities=filtered.entities,
                 use_llm=use_llm_for_profiles,
                 progress_callback=profile_progress,
-                graph_id=state.graph_id,  # Pass graph_id for Zep retrieval
+                graph_id=state.graph_id,  # Pass graph_id for graph retrieval
                 parallel_count=parallel_profile_count,  # Parallel generation count
                 realtime_output_path=realtime_output_path,  # Real-time save path
                 output_platform=realtime_platform  # Output format
