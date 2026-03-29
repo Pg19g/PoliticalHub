@@ -8,14 +8,14 @@
       
       <div class="header-center">
         <div class="view-switcher">
-          <button 
-            v-for="mode in ['graph', 'workbench']"
+          <button
+            v-for="mode in ['graph', 'network', 'workbench']"
             :key="mode"
             class="switch-btn"
             :class="{ active: viewMode === mode }"
             @click="viewMode = mode"
           >
-            {{ { graph: 'Graph', workbench: 'Workbench' }[mode] }}
+            {{ { graph: 'Graph', network: 'Network', workbench: 'Workbench' }[mode] }}
           </button>
         </div>
       </div>
@@ -35,9 +35,10 @@
 
     <!-- Main Content Area -->
     <main class="content-area">
-      <!-- Left Panel: Graph -->
+      <!-- Left Panel: Graph or Network -->
       <div class="panel-wrapper left" :style="leftPanelStyle">
         <GraphPanel
+          v-if="viewMode !== 'network'"
           :graphData="graphData"
           :loading="graphLoading"
           :currentPhase="4"
@@ -45,6 +46,11 @@
           :simulationId="simulationId"
           @refresh="refreshGraph"
           @toggle-maximize="toggleMaximize('graph')"
+        />
+        <NetworkPanel
+          v-else
+          :simulationId="simulationId"
+          :isSimulating="false"
         />
       </div>
 
@@ -66,6 +72,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GraphPanel from '../components/GraphPanel.vue'
+import NetworkPanel from '../components/NetworkPanel.vue'
 import Step4Report from '../components/Step4Report.vue'
 import { getProject, getGraphData } from '../api/graph'
 import { getSimulation } from '../api/simulation'
@@ -93,14 +100,14 @@ const currentStatus = ref('processing') // processing | completed | error
 
 // --- Computed Layout Styles ---
 const leftPanelStyle = computed(() => {
-  if (viewMode.value === 'graph') return { width: '100%', opacity: 1, transform: 'translateX(0)' }
+  if (viewMode.value === 'graph' || viewMode.value === 'network') return { width: '100%', opacity: 1, transform: 'translateX(0)' }
   if (viewMode.value === 'workbench') return { width: '0%', opacity: 0, transform: 'translateX(-20px)' }
   return { width: '50%', opacity: 1, transform: 'translateX(0)' }
 })
 
 const rightPanelStyle = computed(() => {
   if (viewMode.value === 'workbench') return { width: '100%', opacity: 1, transform: 'translateX(0)' }
-  if (viewMode.value === 'graph') return { width: '0%', opacity: 0, transform: 'translateX(20px)' }
+  if (viewMode.value === 'graph' || viewMode.value === 'network') return { width: '0%', opacity: 0, transform: 'translateX(20px)' }
   return { width: '50%', opacity: 1, transform: 'translateX(0)' }
 })
 
