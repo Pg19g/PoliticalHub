@@ -251,7 +251,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getRunStatusDetail, getSimulationTimeline } from '../api/simulation'
+import { getRunStatusDetail } from '../api/simulation'
 
 const route = useRoute()
 const router = useRouter()
@@ -298,10 +298,7 @@ const loadData = async () => {
   error.value = null
 
   try {
-    const [detailRes, timelineRes] = await Promise.all([
-      getRunStatusDetail(simulationId.value),
-      getSimulationTimeline(simulationId.value)
-    ])
+    const detailRes = await getRunStatusDetail(simulationId.value)
 
     if (!detailRes.success || !detailRes.data) {
       error.value = 'Failed to load simulation data'
