@@ -3,6 +3,7 @@ Graph-related API routes
 Uses project context mechanism with server-side persistent state
 """
 
+import json
 import os
 import traceback
 import threading
@@ -54,17 +55,61 @@ def get_project(project_id: str):
 
 
 
+# ============== URL Fetch API ==============
+
+@graph_bp.route('/fetch-url', methods=['POST'])
+def fetch_url():
+    """
+    Fetch a URL and extract readable text for use as a simulation document.
+
+    Request (JSON):
+        { "url": "https://example.com/article" }
+
+    Returns:
+        {
+            "success": true,
+            "data": {
+                "title": "Article Title",
+                "text": "Extracted plain text...",
+                "url": "https://example.com/article",
+                "char_count": 4200
+            }
+        }
+    """
+    try:
+        data = request.get_json() or {}
+        url = data.get('url', '').strip()
+
+        if not url:
+            return jsonify({"success": False, "error": "url is required"}), 400
+
+        from ..utils.url_fetcher import fetch_url_text
+        result = fetch_url_text(url)
+
+        return jsonify({"success": True, "data": result})
+
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"URL fetch error: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Failed to fetch URL: {str(e)}"
+        }), 500
+
+
 # ============== API 1: Upload files and generate ontology ==============
 
 @graph_bp.route('/ontology/generate', methods=['POST'])
 def generate_ontology():
     """
-    API 1: Upload files and analyze to generate ontology definition
+    API 1: Upload files and/or URL-fetched texts, then analyze to generate ontology.
 
     Request format: multipart/form-data
 
     Parameters:
-        files: Uploaded files (PDF/MD/TXT), multiple allowed
+        files: Uploaded files (PDF/MD/TXT), multiple allowed (optional if url_docs provided)
+        url_docs: JSON-encoded list of {title, url, text} objects fetched via /fetch-url (optional)
         simulation_requirement: Simulation requirement description (required)
         project_name: Project name (optional)
         additional_context: Additional notes (optional)
@@ -91,24 +136,35 @@ def generate_ontology():
         simulation_requirement = request.form.get('simulation_requirement', '')
         project_name = request.form.get('project_name', 'Unnamed Project')
         additional_context = request.form.get('additional_context', '')
-        
+        url_docs_raw = request.form.get('url_docs', '')
+
         logger.debug(f"Project name: {project_name}")
         logger.debug(f"Simulation requirement: {simulation_requirement[:100]}...")
-        
+
         if not simulation_requirement:
             return jsonify({
                 "success": False,
                 "error": "Please provide a simulation requirement description (simulation_requirement)"
             }), 400
-        
+
+        # Parse URL docs (pre-fetched via /fetch-url)
+        url_docs = []
+        if url_docs_raw:
+            try:
+                url_docs = json.loads(url_docs_raw)
+            except Exception:
+                logger.warning("Failed to parse url_docs field, ignoring")
+
         # Get uploaded files
         uploaded_files = request.files.getlist('files')
-        if not uploaded_files or all(not f.filename for f in uploaded_files):
+        has_files = uploaded_files and any(f.filename for f in uploaded_files)
+
+        if not has_files and not url_docs:
             return jsonify({
                 "success": False,
-                "error": "Please upload at least one document file"
+                "error": "Please upload at least one document file or provide URL documents"
             }), 400
-        
+
         # Create project
         project = ProjectManager.create_project(name=project_name)
         project.simulation_requirement = simulation_requirement
@@ -117,26 +173,42 @@ def generate_ontology():
         # Save files and extract text
         document_texts = []
         all_text = ""
-        
+
         for file in uploaded_files:
             if file and file.filename and allowed_file(file.filename):
                 # Save file to project directory
                 file_info = ProjectManager.save_file_to_project(
-                    project.project_id, 
-                    file, 
+                    project.project_id,
+                    file,
                     file.filename
                 )
                 project.files.append({
                     "filename": file_info["original_filename"],
                     "size": file_info["size"]
                 })
-                
+
                 # Extract text
                 text = FileParser.extract_text(file_info["path"])
                 text = TextProcessor.preprocess_text(text)
                 document_texts.append(text)
                 all_text += f"\n\n=== {file_info['original_filename']} ===\n{text}"
-        
+
+        # Incorporate URL-fetched documents
+        for doc in url_docs:
+            title = doc.get('title') or doc.get('url', 'URL Document')
+            text = doc.get('text', '').strip()
+            if not text:
+                continue
+            text = TextProcessor.preprocess_text(text)
+            document_texts.append(text)
+            all_text += f"\n\n=== {title} ===\n{text}"
+            project.files.append({
+                "filename": title,
+                "size": len(text),
+                "url": doc.get('url', '')
+            })
+            logger.info(f"Incorporated URL doc: {title} ({len(text)} chars)")
+
         if not document_texts:
             ProjectManager.delete_project(project.project_id)
             return jsonify({

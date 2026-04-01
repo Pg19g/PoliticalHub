@@ -68,3 +68,18 @@ export function getProject(projectId) {
     method: 'get'
   })
 }
+
+/**
+ * Fetch a URL and extract its text content for simulation input
+ * @param {String} url - The URL to fetch
+ * @returns {Promise<{title, text, url, char_count}>}
+ */
+export function fetchUrl(url) {
+  return requestWithRetry(() =>
+    service({
+      url: '/api/graph/fetch-url',
+      method: 'post',
+      data: { url }
+    })
+  )
+}

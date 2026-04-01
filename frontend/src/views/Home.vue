@@ -140,6 +140,43 @@
               </div>
             </div>
 
+            <!-- URL Input Section -->
+            <div class="console-section url-section">
+              <div class="console-header">
+                <span class="console-label">01b / URL Import</span>
+                <span class="console-meta">Paste article or report URL</span>
+              </div>
+              <div class="url-input-row">
+                <input
+                  v-model="urlInput"
+                  class="url-input"
+                  type="url"
+                  placeholder="https://example.com/article"
+                  :disabled="loading || urlFetching"
+                  @keydown.enter.prevent="fetchUrlDoc"
+                />
+                <button
+                  class="url-fetch-btn"
+                  @click="fetchUrlDoc"
+                  :disabled="!urlInput.trim() || loading || urlFetching"
+                >
+                  <span v-if="urlFetching">...</span>
+                  <span v-else>Fetch →</span>
+                </button>
+              </div>
+              <div v-if="urlError" class="url-error">{{ urlError }}</div>
+              <div v-if="urlDocs.length > 0" class="url-doc-list">
+                <div v-for="(doc, index) in urlDocs" :key="index" class="url-doc-item">
+                  <span class="url-doc-icon">◈</span>
+                  <div class="url-doc-info">
+                    <div class="url-doc-title">{{ doc.title }}</div>
+                    <div class="url-doc-meta">{{ doc.char_count.toLocaleString() }} chars · {{ doc.url }}</div>
+                  </div>
+                  <button @click.stop="removeUrlDoc(index)" class="remove-btn">×</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Divider -->
             <div class="console-divider">
               <span>Input Parameters</span>
@@ -193,6 +230,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import TemplateGallery from '../components/TemplateGallery.vue'
+import { fetchUrl } from '../api/graph'
 
 const router = useRouter()
 
@@ -204,6 +242,12 @@ const formData = ref({
 // File list
 const files = ref([])
 
+// URL import state
+const urlInput = ref('')
+const urlDocs = ref([])   // [{title, url, text, char_count}]
+const urlFetching = ref(false)
+const urlError = ref('')
+
 // State
 const loading = ref(false)
 const error = ref('')
@@ -214,7 +258,8 @@ const fileInput = ref(null)
 
 // Computed: whether the form can be submitted
 const canSubmit = computed(() => {
-  return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
+  return formData.value.simulationRequirement.trim() !== '' &&
+    (files.value.length > 0 || urlDocs.value.length > 0)
 })
 
 // Trigger file selection
@@ -271,14 +316,47 @@ const scrollToBottom = () => {
   })
 }
 
+// Fetch a URL and add it to urlDocs
+const fetchUrlDoc = async () => {
+  const url = urlInput.value.trim()
+  if (!url || urlFetching.value) return
+
+  // Prevent duplicate URLs
+  if (urlDocs.value.some(d => d.url === url)) {
+    urlError.value = 'This URL has already been added.'
+    return
+  }
+
+  urlFetching.value = true
+  urlError.value = ''
+  try {
+    const res = await fetchUrl(url)
+    if (res.success) {
+      urlDocs.value.push(res.data)
+      urlInput.value = ''
+    } else {
+      urlError.value = res.error || 'Failed to fetch URL.'
+    }
+  } catch (err) {
+    urlError.value = err.message || 'Failed to fetch URL.'
+  } finally {
+    urlFetching.value = false
+  }
+}
+
+// Remove a URL document from the list
+const removeUrlDoc = (index) => {
+  urlDocs.value.splice(index, 1)
+}
+
 // Start simulation - navigate immediately, API calls happen on the Process page
 const startSimulation = () => {
   if (!canSubmit.value || loading.value) return
-  
+
   // Store data pending upload
   import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
-    setPendingUpload(files.value, formData.value.simulationRequirement)
-    
+    setPendingUpload(files.value, formData.value.simulationRequirement, urlDocs.value)
+
     // Navigate immediately to Process page (using special identifier for new project)
     router.push({
       name: 'Process',
@@ -878,6 +956,120 @@ const startSimulation = () => {
 @keyframes btn-pulse {
   0%, 100% { border-color: var(--color-black); }
   50% { border-color: var(--color-orange); }
+}
+
+/* ── URL Import Section ── */
+.url-section {
+  padding-top: 0;
+}
+
+.url-input-row {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.url-input {
+  flex: 1;
+  border: var(--border-light);
+  background: var(--color-gray);
+  padding: var(--space-xs) var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--foreground);
+  outline: none;
+  transition: var(--transition-fast);
+  min-width: 0;
+}
+
+.url-input:focus {
+  border-color: var(--color-orange);
+  background: var(--background);
+}
+
+.url-input::placeholder {
+  color: rgba(10,10,10,0.3);
+}
+
+.url-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.url-fetch-btn {
+  background: var(--color-black);
+  color: var(--color-white);
+  border: 2px solid var(--color-black);
+  padding: var(--space-xs) var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.url-fetch-btn:hover:not(:disabled) {
+  background: var(--color-orange);
+  border-color: var(--color-orange);
+}
+
+.url-fetch-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.url-error {
+  margin-top: var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-red);
+}
+
+.url-doc-list {
+  margin-top: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.url-doc-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  background: var(--background);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-light);
+  border-left: 3px solid var(--color-green);
+}
+
+.url-doc-icon {
+  color: var(--color-green);
+  font-size: 14px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.url-doc-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.url-doc-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url-doc-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(10,10,10,0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Footer ── */
