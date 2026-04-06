@@ -7,8 +7,13 @@
         <a href="https://github.com/aaronjmars/MiroShark" target="_blank" class="github-link">
           GitHub <span class="arrow">↗</span>
         </a>
+        <button class="settings-btn" @click="settingsOpen = true" title="Settings">
+          ⚙
+        </button>
       </div>
     </nav>
+
+    <SettingsPanel :open="settingsOpen" @close="settingsOpen = false" />
 
     <div class="main-content">
       <!-- Upper Section: Hero Area -->
@@ -230,7 +235,10 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import TemplateGallery from '../components/TemplateGallery.vue'
+import SettingsPanel from '../components/SettingsPanel.vue'
 import { fetchUrl } from '../api/graph'
+
+const settingsOpen = ref(false)
 
 const router = useRouter()
 
@@ -418,6 +426,19 @@ const startSimulation = () => {
 .github-link:hover { opacity: 1; }
 
 .arrow { font-family: sans-serif; }
+
+.settings-btn {
+  background: none;
+  border: none;
+  color: rgba(250,250,250,0.5);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 0 0 var(--space-md);
+  line-height: 1;
+  transition: var(--transition-fast);
+}
+
+.settings-btn:hover { color: var(--color-orange); }
 
 /* ── Main Content ── */
 .main-content {
