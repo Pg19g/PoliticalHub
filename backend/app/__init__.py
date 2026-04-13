@@ -58,6 +58,42 @@ def create_app(config_class=Config):
         # Store None so endpoints can return 503 gracefully
         app.extensions['neo4j_storage'] = None
 
+    # --- Initialize Context Layer (political intelligence) ---
+    from .context.config import ContextConfig
+    if ContextConfig.ENABLED:
+        try:
+            from .context.storage.qdrant_store import QdrantStore
+            from .context.storage.neo4j_political import Neo4jPolitical
+            from .context.embedding.embedder import Embedder
+            from .context.enrichment.political_enricher import PoliticalEnricher
+            from .context.scheduler import ContextScheduler
+
+            redis_client = None
+            if ContextConfig.REDIS_URL:
+                import redis
+                redis_client = redis.from_url(ContextConfig.REDIS_URL, decode_responses=True)
+
+            qdrant = QdrantStore()
+            neo4j_pol = Neo4jPolitical(neo4j_storage) if neo4j_storage else None
+            embedder = Embedder()
+            enricher = PoliticalEnricher(qdrant, neo4j_pol, embedder, redis_client)
+
+            app.extensions['political_enricher'] = enricher
+
+            # Start scheduler (only in reloader subprocess to avoid double-start)
+            if neo4j_pol and (not debug_mode or is_reloader_process):
+                ctx_scheduler = ContextScheduler(qdrant, neo4j_pol, embedder, redis_client)
+                ctx_scheduler.start()
+                app.extensions['context_scheduler'] = ctx_scheduler
+
+            if should_log_startup:
+                logger.info("Political context layer initialized (Qdrant + Neo4j + scheduler)")
+        except Exception as e:
+            logger.warning(f"Political context layer failed to initialize: {e}")
+            app.extensions['political_enricher'] = None
+    else:
+        app.extensions['political_enricher'] = None
+
     # Register simulation process cleanup function (ensure all simulation processes are terminated when server shuts down)
     from .services.simulation_runner import SimulationRunner
     SimulationRunner.register_cleanup()

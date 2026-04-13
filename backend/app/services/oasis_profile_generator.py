@@ -574,6 +574,22 @@ class OasisProfileGenerator:
         if web_context:
             context_parts.append(web_context)
 
+        # 6. Political context enrichment — inject Polish political knowledge
+        try:
+            from flask import current_app
+            enricher = current_app.extensions.get('political_enricher')
+            if enricher:
+                entity_type = entity.get_entity_type() or "Entity"
+                political_ctx = enricher.enrich(
+                    query=self.simulation_requirement,
+                    entity_name=entity.name,
+                    entity_type=entity_type.lower(),
+                )
+                if political_ctx.get('context_text'):
+                    context_parts.append("### Polish Political Context\n" + political_ctx['context_text'])
+        except Exception as e:
+            logger.debug(f"Political enrichment skipped for {entity.name}: {e}")
+
         return "\n\n".join(context_parts)
     
     def _is_individual_entity(self, entity_type: str) -> bool:
