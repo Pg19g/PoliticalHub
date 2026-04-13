@@ -23,7 +23,7 @@ class Neo4jPolitical:
             "CREATE CONSTRAINT IF NOT EXISTS FOR (b:Bill) REQUIRE b.number IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Committee) REQUIRE c.name IS UNIQUE",
         ]
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             for cypher in constraints:
                 try:
                     session.run(cypher)
@@ -45,7 +45,7 @@ class Neo4jPolitical:
         MERGE (party:Party {name: $party})
         MERGE (p)-[:MEMBER_OF]->(party)
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             session.run(cypher, **data)
 
     def upsert_bill(self, data: Dict[str, Any]):
@@ -58,7 +58,7 @@ class Neo4jPolitical:
             b.date = $date,
             b.updated_at = datetime()
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             session.run(cypher, **data)
 
     def record_vote(self, sejm_id: int, bill_number: str, vote: str):
@@ -69,7 +69,7 @@ class Neo4jPolitical:
         MERGE (p)-[v:VOTED]->(b)
         SET v.vote = $vote, v.recorded_at = datetime()
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             session.run(cypher, sejm_id=sejm_id, bill_number=bill_number, vote=vote)
 
     def upsert_committee(self, name: str, committee_type: str):
@@ -78,7 +78,7 @@ class Neo4jPolitical:
         MERGE (c:Committee {name: $name})
         SET c.type = $type, c.updated_at = datetime()
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             session.run(cypher, name=name, type=committee_type)
 
     def set_committee_membership(self, sejm_id: int, committee_name: str):
@@ -88,7 +88,7 @@ class Neo4jPolitical:
         MATCH (c:Committee {name: $committee_name})
         MERGE (p)-[:SITS_ON]->(c)
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             session.run(cypher, sejm_id=sejm_id, committee_name=committee_name)
 
     def update_polls(self, polls: Dict[str, float]):
@@ -97,7 +97,7 @@ class Neo4jPolitical:
         MERGE (p:Party {name: $name})
         SET p.polls_pct = $pct, p.polls_updated_at = datetime()
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             for party_name, pct in polls.items():
                 session.run(cypher, name=party_name, pct=pct)
         logger.info(f"Updated polls for {len(polls)} parties")
@@ -114,7 +114,7 @@ class Neo4jPolitical:
         RETURN party_name, vote, cnt
         ORDER BY party_name, cnt DESC
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             result = session.run(cypher, topic=topic)
             return [dict(r) for r in result]
 
@@ -126,7 +126,7 @@ class Neo4jPolitical:
         RETURN p.name AS name, p.polls_pct AS pct
         ORDER BY p.polls_pct DESC
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             result = session.run(cypher)
             return {r['name']: r['pct'] for r in result}
 
@@ -140,7 +140,7 @@ class Neo4jPolitical:
                party.name AS party, party.polls_pct AS party_polls
         LIMIT 5
         """
-        with self.storage.driver.session() as session:
+        with self.storage._driver.session() as session:
             result = session.run(cypher, name=name)
             records = [dict(r) for r in result]
             return records[0] if records else None
