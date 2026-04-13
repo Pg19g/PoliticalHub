@@ -3,6 +3,7 @@
 import hashlib
 import logging
 import re
+import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -34,8 +35,8 @@ def _detect_parties(text: str) -> List[str]:
 
 
 def _url_hash(url: str) -> str:
-    """Short hash for dedup."""
-    return hashlib.md5(url.encode()).hexdigest()[:16]
+    """Deterministic UUID from URL for Qdrant point ID + Redis dedup."""
+    return str(uuid.UUID(hashlib.md5(url.encode()).hexdigest()))
 
 
 def _clean_html(raw: str) -> str:

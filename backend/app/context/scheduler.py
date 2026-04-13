@@ -1,6 +1,8 @@
 """Scheduler for context ingestion jobs (RSS fetch, embed, Sejm sync)."""
 
+import hashlib
 import logging
+import uuid
 from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -133,7 +135,7 @@ class ContextScheduler:
             articles = []
             for s in summaries:
                 articles.append({
-                    'id': f"wiki_{s['politician_name'].lower().replace(' ', '_')}",
+                    'id': str(uuid.UUID(hashlib.md5(f"wiki_{s['politician_name']}".encode()).hexdigest())),
                     'title': f"Wikipedia: {s['title']}",
                     'content': s['extract'],
                     'source': 'wikipedia',

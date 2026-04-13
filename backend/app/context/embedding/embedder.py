@@ -15,11 +15,11 @@ class Embedder:
     """Generates text embeddings using the configured embedding provider."""
 
     def __init__(self):
+        # Use LLM_BASE_URL (OpenRouter) for context embeddings,
+        # not EMBEDDING_BASE_URL which may point to Ollama
         self.client = OpenAI(
-            api_key=Config.EMBEDDING_API_KEY or Config.LLM_API_KEY,
-            base_url=Config.EMBEDDING_BASE_URL
-            if Config.EMBEDDING_PROVIDER == 'openai'
-            else f"{Config.EMBEDDING_BASE_URL}/v1",
+            api_key=Config.LLM_API_KEY,
+            base_url=Config.LLM_BASE_URL,
         )
         self.model = ContextConfig.EMBEDDING_MODEL
         self.dimensions = ContextConfig.EMBEDDING_DIMENSIONS
