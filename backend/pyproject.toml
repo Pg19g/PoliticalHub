@@ -46,6 +46,12 @@ dependencies = [
     # Utility libraries
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+
+    # Context Worker — political intelligence layer
+    "feedparser>=6.0.0",
+    "qdrant-client>=1.9.0",
+    "redis>=5.0.0",
+    "APScheduler>=3.10.0",
 ]
 
 [project.optional-dependencies]
