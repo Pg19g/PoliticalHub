@@ -10,6 +10,7 @@ report_bp = Blueprint('report', __name__)
 templates_bp = Blueprint('templates', __name__)
 settings_bp = Blueprint('settings', __name__)
 observability_bp = Blueprint('observability', __name__)
+context_bp = Blueprint('context', __name__)
 
 from . import graph  # noqa: E402, F401
 from . import simulation  # noqa: E402, F401
@@ -17,4 +18,5 @@ from . import report  # noqa: E402, F401
 from . import templates  # noqa: E402, F401
 from . import settings  # noqa: E402, F401
 from . import observability  # noqa: E402, F401
+from . import context  # noqa: E402, F401
 
