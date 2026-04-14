@@ -54,6 +54,20 @@ def context_diagnostics():
                 result['neo4j']['votes'] = r.single()['cnt']
                 r = session.run("MATCH ()-[m:MEMBER_OF]->() RETURN count(m) AS cnt")
                 result['neo4j']['memberships'] = r.single()['cnt']
+                # Party distribution (MPs per party)
+                r = session.run("""
+                    MATCH (p:Politician)-[:MEMBER_OF]->(party:Party)
+                    RETURN party.name AS party, count(p) AS count, party.polls_pct AS polls
+                    ORDER BY count DESC
+                """)
+                result['neo4j']['party_distribution'] = [dict(rec) for rec in r]
+
+                # Personas stats
+                r = session.run("MATCH (p:Politician) WHERE p.persona IS NOT NULL RETURN count(p) AS cnt")
+                result['neo4j']['politicians_with_persona'] = r.single()['cnt']
+                r = session.run("MATCH (p:Party) WHERE p.persona IS NOT NULL RETURN count(p) AS cnt")
+                result['neo4j']['parties_with_persona'] = r.single()['cnt']
+
                 # Sample politicians
                 r = session.run("MATCH (p:Politician) RETURN p.name AS name, p.party AS party LIMIT 10")
                 result['neo4j']['sample_politicians'] = [dict(rec) for rec in r]
