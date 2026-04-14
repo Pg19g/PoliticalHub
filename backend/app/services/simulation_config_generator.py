@@ -750,7 +750,8 @@ Return JSON format (no markdown):
             "- Schedule 2-3 'plot twists' — new information that changes the dynamic mid-simulation.\n"
             "- Hot topics should emerge from the scenario, not be forced. Think: what would trend?\n"
             "- poster_type must exactly match available entity types.\n"
-            "- Narrative direction should have tension — not everyone agrees, and that's the point."
+            "- Narrative direction should have tension — not everyone agrees, and that's the point.\n"
+            "The simulation takes place in Poland. All hot_topics, narrative_direction, and initial_posts content must be in Polish. poster_type names should reference Polish political actors."
         )
 
         try:

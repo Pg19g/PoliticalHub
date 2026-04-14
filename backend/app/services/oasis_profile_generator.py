@@ -794,7 +794,7 @@ class OasisProfileGenerator:
                 "balanced-sounding descriptions. Every person has biases, blind spots, and "
                 "strong feelings about something. Lean into those.\n\n"
                 "Return valid JSON. All string values must be plain text (no newlines, no markdown). "
-                "Use English."
+                "Use English.\n\nIMPORTANT: Generate the persona in Polish (język polski). The bio, persona description, and all character details must be written in Polish. The character is a Polish citizen participating in Polish political discourse."
             )
         return (
             "You are an expert in institutional communications creating official social media "
@@ -802,7 +802,7 @@ class OasisProfileGenerator:
             "voice — formal but not robotic, on-message but not tone-deaf. They hedge on "
             "controversies, amplify achievements, and deflect criticism with practiced diplomacy.\n\n"
             "Return valid JSON. All string values must be plain text (no newlines, no markdown). "
-            "Use English."
+            "Use English.\n\nIMPORTANT: Generate the persona in Polish (język polski). The bio, persona description, and all character details must be written in Polish. The character is a Polish citizen participating in Polish political discourse."
         )
     
     def _build_individual_persona_prompt(
@@ -847,6 +847,8 @@ Return JSON with these fields:
 "interested_topics": ["topic1", "topic2", ...] (3-6 topics)
 
 IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count — those are computed separately.
+
+Write the entire persona in Polish. This person lives in Poland and participates in Polish politics.
 """
 
     def _build_group_persona_prompt(
@@ -893,8 +895,10 @@ Examples: "ISTJ" (conservative, by-the-book), "ENTJ" (assertive, agenda-setting)
 "interested_topics": ["topic1", "topic2", ...] (3-6 focus areas)
 
 IMPORTANT: Do NOT include karma, friend_count, follower_count, or statuses_count — those are computed separately.
+
+Write the entire persona in Polish. This person lives in Poland and participates in Polish politics.
 """
-    
+
     def _generate_profile_rule_based(
         self,
         entity_name: str,
