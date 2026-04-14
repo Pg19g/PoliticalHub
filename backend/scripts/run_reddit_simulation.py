@@ -510,22 +510,26 @@ class RedditSimulationRunner:
         target_count = int(random.uniform(base_min, base_max) * multiplier)
         
         candidates = []
+        all_agent_ids = []
         for cfg in agent_configs:
             agent_id = cfg.get("agent_id", 0)
-            active_hours = cfg.get("active_hours", list(range(8, 23)))
-            activity_level = cfg.get("activity_level", 0.5)
-            
-            if current_hour not in active_hours:
-                continue
-            
+            activity_level = max(cfg.get("activity_level", 0.5), 0.6)
+            all_agent_ids.append(agent_id)
+
             if random.random() < activity_level:
                 candidates.append(agent_id)
-        
+
+        # Ensure minimum 3 agents per round
+        if len(candidates) < 3 and all_agent_ids:
+            extras = [aid for aid in all_agent_ids if aid not in candidates]
+            random.shuffle(extras)
+            candidates.extend(extras[:3 - len(candidates)])
+
         selected_ids = random.sample(
-            candidates, 
+            candidates,
             min(target_count, len(candidates))
         ) if candidates else []
-        
+
         active_agents = []
         for agent_id in selected_ids:
             try:
@@ -533,7 +537,7 @@ class RedditSimulationRunner:
                 active_agents.append((agent_id, agent))
             except Exception:
                 pass
-        
+
         return active_agents
 
     def _init_belief_system(self):

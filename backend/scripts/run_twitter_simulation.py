@@ -498,38 +498,37 @@ class TwitterSimulationRunner:
         
         # Calculate activation probability based on each Agent's configuration
         candidates = []
+        all_agent_ids = []
         for cfg in agent_configs:
             agent_id = cfg.get("agent_id", 0)
-            active_hours = cfg.get("active_hours", list(range(8, 23)))
-            activity_level = cfg.get("activity_level", 0.5)
-            
-            # Check if within active hours
-            if current_hour not in active_hours:
-                continue
-            
-            # Calculate probability based on activity level
+            activity_level = max(cfg.get("activity_level", 0.5), 0.6)  # Floor at 0.6
+            all_agent_ids.append(agent_id)
+
+            # Skip active_hours check — in political simulations all agents
+            # are engaged when a hot topic drops, regardless of time of day
             if random.random() < activity_level:
                 candidates.append(agent_id)
-        
-        # Random selection
+
+        # Ensure minimum 3 agents per round (never skip a round)
+        if len(candidates) < 3 and all_agent_ids:
+            extras = [aid for aid in all_agent_ids if aid not in candidates]
+            random.shuffle(extras)
+            candidates.extend(extras[:3 - len(candidates)])
+
+        # Select up to target_count
         selected_ids = random.sample(
-            candidates, 
+            candidates,
             min(target_count, len(candidates))
         ) if candidates else []
-        
+
         # Convert to Agent objects
         active_agents = []
         for agent_id in selected_ids:
             try:
                 agent = env.agent_graph.get_agent(agent_id)
                 active_agents.append((agent_id, agent))
-            except Exception as e:
-                print(f"  [DEBUG] Agent {agent_id} lookup failed: {e}")
-
-        print(f"  [ACTIVE] hour={current_hour}, round={round_num}, "
-              f"target={target_count}, candidates={len(candidates)}, "
-              f"selected={len(selected_ids)}, active={len(active_agents)}, "
-              f"total_configs={len(agent_configs)}")
+            except Exception:
+                pass
 
         return active_agents
     
