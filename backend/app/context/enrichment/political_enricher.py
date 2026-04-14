@@ -139,6 +139,15 @@ class PoliticalEnricher:
         if persona_text:
             parts.append(persona_text)
 
+        # 6. Voter archetype — communication style from data, not LLM training
+        try:
+            from ..data.voter_archetypes import get_archetype_for_entity_type, format_archetype_for_prompt
+            archetype = get_archetype_for_entity_type(entity_type, entity_name)
+            if archetype:
+                parts.append(format_archetype_for_prompt(archetype))
+        except Exception as e:
+            logger.debug(f"Archetype lookup skipped: {e}")
+
         result['context_text'] = "\n\n".join(parts)
 
         # Cache
