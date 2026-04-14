@@ -9,7 +9,7 @@ import DebugPanel from './components/DebugPanel.vue'
 
 <style>
 /* ═══════════════════════════════════════════════════════════
-   MIROSHARK DESIGN SYSTEM — Hyperstitions v2.0
+   ALUQA DESIGN SYSTEM — Hyperstitions v2.0
    Evangelion-inspired. Orange + Green bicolor. 1.4x scale.
    ═══════════════════════════════════════════════════════════ */
 

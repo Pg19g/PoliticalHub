@@ -2,9 +2,9 @@
   <div class="home-container">
     <!-- Top Navigation Bar -->
     <nav class="navbar">
-      <div class="nav-brand">MIROSHARK</div>
+      <div class="nav-brand">ALUQA</div>
       <div class="nav-links">
-        <a href="https://github.com/aaronjmars/MiroShark" target="_blank" class="github-link">
+        <a href="https://github.com/Pg19g/PoliticalHub" target="_blank" class="github-link">
           GitHub <span class="arrow">↗</span>
         </a>
         <button class="settings-btn" @click="settingsOpen = true" title="Settings">
@@ -28,7 +28,7 @@
 
         <div class="hero-desc">
           <p>
-            Upload any document. <span class="highlight-bold">MiroShark</span> extracts the key players, generates <span class="highlight-orange">hundreds of AI agents</span> with unique personas, and simulates how they'd react on Twitter, Reddit, and Polymarket. Watch opinions form, arguments spread, and markets move.
+            Upload any document. <span class="highlight-bold">Aluqa</span> extracts the key players, generates <span class="highlight-orange">hundreds of AI agents</span> with unique personas, and simulates how they'd react on Twitter, Reddit, and Polymarket. Watch opinions form, arguments spread, and markets move.
           </p>
           <p class="slogan-text">
             Don't predict the future. Simulate it<span class="blinking-cursor">_</span>
@@ -200,7 +200,7 @@
                   rows="6"
                   :disabled="loading"
                 ></textarea>
-                <div class="model-badge">Engine: MiroShark-V1.0</div>
+                <div class="model-badge">Engine: Aluqa-V1.0</div>
               </div>
             </div>
 

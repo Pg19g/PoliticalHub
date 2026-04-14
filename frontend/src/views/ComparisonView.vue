@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="cmp-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROSHARK</div>
+        <div class="brand" @click="router.push('/')">ALUQA</div>
       </div>
       <div class="header-center">
         <span class="page-tag">Simulation Comparison</span>

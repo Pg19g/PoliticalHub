@@ -463,7 +463,7 @@ const downloadExport = async (format) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `miroshark_export_${props.simulationId.slice(0, 12)}.${format}`
+    a.download = `aluqa_export_${props.simulationId.slice(0, 12)}.${format}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
