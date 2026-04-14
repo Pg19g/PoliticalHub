@@ -85,6 +85,43 @@ def trigger_sejm():
     return jsonify({'status': 'ok', 'message': 'Sejm sync triggered'})
 
 
+@context_bp.route('/trigger/personas', methods=['POST'])
+def trigger_personas():
+    """Generate rich personas for top politicians + parties via Gemini Search Grounding."""
+    enricher = current_app.extensions.get('political_enricher')
+    if not enricher or not enricher.neo4j:
+        return jsonify({'error': 'Context layer not initialized'}), 503
+
+    from ..context.ingestion.persona_generator import PersonaGenerator
+    from ..context.storage.persona_store import PersonaStore
+
+    try:
+        generator = PersonaGenerator()
+        store = PersonaStore(enricher.neo4j.storage)
+
+        results = generator.generate_all(delay=2.0)
+
+        # Save to Neo4j
+        for persona in results["politicians"]:
+            store.save_politician_persona(persona)
+        for persona in results["parties"]:
+            store.save_party_persona(persona)
+
+        stats = store.stats()
+        return jsonify({
+            'status': 'ok',
+            'generated': {
+                'politicians': len(results['politicians']),
+                'parties': len(results['parties']),
+                'errors': len(results['errors']),
+            },
+            'stored': stats,
+            'error_details': results['errors'][:10],
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @context_bp.route('/trigger/wiki', methods=['POST'])
 def trigger_wiki():
     """Manually trigger Wikipedia politician profiles sync."""

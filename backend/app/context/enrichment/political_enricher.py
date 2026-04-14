@@ -26,11 +26,13 @@ class PoliticalEnricher:
         neo4j_political: Neo4jPolitical,
         embedder: Embedder,
         redis_client=None,
+        persona_store=None,
     ):
         self.qdrant = qdrant
         self.neo4j = neo4j_political
         self.embedder = embedder
         self.redis = redis_client
+        self.persona_store = persona_store
         self._cache_ttl = 300
 
     def enrich(
@@ -101,6 +103,17 @@ class PoliticalEnricher:
             except Exception as e:
                 logger.warning(f"Politician lookup failed: {e}")
 
+        # 5. Rich persona from Gemini-generated profiles
+        persona_text = None
+        if self.persona_store:
+            try:
+                party_name = ""
+                if politician_info:
+                    party_name = politician_info.get("party", "")
+                persona_text = self.persona_store.get_persona_for_agent(entity_name, party_name)
+            except Exception as e:
+                logger.warning(f"Persona lookup failed: {e}")
+
         # Assemble context text
         parts = []
 
@@ -122,6 +135,9 @@ class PoliticalEnricher:
             parts.append(f"### Profil polityka\n"
                          f"- {politician_info['name']} ({politician_info.get('party', '?')})\n"
                          f"- Rola: {politician_info.get('role', 'poseł')}")
+
+        if persona_text:
+            parts.append(persona_text)
 
         result['context_text'] = "\n\n".join(parts)
 

@@ -76,7 +76,9 @@ def create_app(config_class=Config):
             qdrant = QdrantStore()
             neo4j_pol = Neo4jPolitical(neo4j_storage) if neo4j_storage else None
             embedder = Embedder()
-            enricher = PoliticalEnricher(qdrant, neo4j_pol, embedder, redis_client)
+            from .context.storage.persona_store import PersonaStore
+            persona_store = PersonaStore(neo4j_storage) if neo4j_storage else None
+            enricher = PoliticalEnricher(qdrant, neo4j_pol, embedder, redis_client, persona_store)
 
             app.extensions['political_enricher'] = enricher
 
