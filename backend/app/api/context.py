@@ -99,7 +99,9 @@ def trigger_personas():
         generator = PersonaGenerator()
         store = PersonaStore(enricher.neo4j.storage)
 
-        results = generator.generate_all(delay=2.0)
+        # Skip personas that are still fresh (TTL 14 days)
+        fresh_names = store.get_fresh_persona_names(ttl_days=14)
+        results = generator.generate_all(existing_names=fresh_names)
 
         # Save to Neo4j
         for persona in results["politicians"]:
@@ -114,9 +116,11 @@ def trigger_personas():
                 'politicians': len(results['politicians']),
                 'parties': len(results['parties']),
                 'errors': len(results['errors']),
+                'skipped': len(results['skipped']),
             },
             'stored': stats,
             'error_details': results['errors'][:10],
+            'skipped_names': results['skipped'][:10],
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

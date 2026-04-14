@@ -144,6 +144,23 @@ class PersonaStore:
         name = persona.get("name", persona.get("party", "?"))
         return f"### {prefix}: {name}\n" + "\n".join(parts)
 
+    def get_fresh_persona_names(self, ttl_days: int = 14) -> set:
+        """Return set of names that have personas newer than ttl_days."""
+        cypher = """
+        MATCH (p)
+        WHERE (p:Politician OR p:Party)
+          AND p.persona IS NOT NULL
+          AND p.persona_updated_at IS NOT NULL
+          AND p.persona_updated_at > datetime() - duration({days: $ttl_days})
+        RETURN p.name AS name
+        """
+        names = set()
+        with self.storage._driver.session() as session:
+            result = session.run(cypher, ttl_days=ttl_days)
+            for r in result:
+                names.add(r["name"])
+        return names
+
     def stats(self) -> Dict[str, int]:
         """Count politicians and parties with personas."""
         result = {"politicians_with_persona": 0, "parties_with_persona": 0}
