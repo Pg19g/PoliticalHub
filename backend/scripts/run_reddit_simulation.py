@@ -692,8 +692,11 @@ class RedditSimulationRunner:
         print("\nStarting simulation loop...")
         start_time = datetime.now()
         
+        # Start simulation at 8:00 AM so agents are within active_hours
+        start_hour_offset = time_config.get("start_hour", 8) * 60
+
         for round_num in range(total_rounds):
-            simulated_minutes = round_num * minutes_per_round
+            simulated_minutes = start_hour_offset + round_num * minutes_per_round
             simulated_hour = (simulated_minutes // 60) % 24
             simulated_day = simulated_minutes // (60 * 24) + 1
             
