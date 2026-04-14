@@ -523,9 +523,14 @@ class TwitterSimulationRunner:
             try:
                 agent = env.agent_graph.get_agent(agent_id)
                 active_agents.append((agent_id, agent))
-            except Exception:
-                pass
-        
+            except Exception as e:
+                print(f"  [DEBUG] Agent {agent_id} lookup failed: {e}")
+
+        print(f"  [ACTIVE] hour={current_hour}, round={round_num}, "
+              f"target={target_count}, candidates={len(candidates)}, "
+              f"selected={len(selected_ids)}, active={len(active_agents)}, "
+              f"total_configs={len(agent_configs)}")
+
         return active_agents
     
     async def run(self, max_rounds: int = None):
