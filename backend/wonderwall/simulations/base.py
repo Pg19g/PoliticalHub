@@ -297,12 +297,9 @@ class BaseAction(ABC):
         return await self.perform_action(user_message, "sign_up")
 
     async def do_nothing(self):
-        """Skip this round and take no action. Choose this when the current
-        market state already reflects your beliefs, no new information has
-        emerged, or you want to conserve capital and wait for a better
-        opportunity. Good traders and users are patient — not every round
-        requires action. This should be your most common choice (30-50%
-        of rounds).
+        """Skip this round. Use ONLY when the topic is completely irrelevant
+        to you or you have absolutely nothing to add. In political debates,
+        most people engage — use this sparingly.
 
         Returns:
             dict: {"success": True}

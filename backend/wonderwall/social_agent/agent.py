@@ -164,10 +164,11 @@ class SocialAgent(ChatAgent):
         user_msg = BaseMessage.make_user_message(
             role_name="User",
             content=(
-                f"Please perform actions after observing the "
-                f"platform environment. Use the available tools to take "
-                f"action. Don't limit yourself to just one type of action. "
-                f"Here is your current environment: {env_prompt}"))
+                f"Observe the platform and react. You MUST call one of the "
+                f"available tools. If the topic relates to your interests or "
+                f"triggers your emotions, post or comment. You are an active "
+                f"participant, not a passive observer. "
+                f"Here is your current environment:\n\n{env_prompt}"))
         try:
             agent_log.info(
                 f"Agent {self.social_agent_id} observing environment: "
