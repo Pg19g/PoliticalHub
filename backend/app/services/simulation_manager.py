@@ -299,7 +299,26 @@ class SimulationManager:
                 defined_entity_types=defined_entity_types,
                 enrich_with_edges=True
             )
-            
+
+            # ========== Phase 1.5: Merge NER entities with voter groups from requirement ==========
+            try:
+                from .requirement_parser import merge_entities_with_groups
+                merged_entities = merge_entities_with_groups(
+                    ner_entities=filtered.entities,
+                    requirement=simulation_requirement,
+                )
+                filtered.entities = merged_entities
+                filtered.filtered_count = len(merged_entities)
+                # Update entity types
+                all_types = set()
+                for e in merged_entities:
+                    et = e.get_entity_type()
+                    if et:
+                        all_types.add(et)
+                filtered.entity_types = all_types
+            except Exception as e:
+                logger.warning(f"Requirement parsing failed, using NER entities only: {e}")
+
             state.entities_count = filtered.filtered_count
             state.entity_types = list(filtered.entity_types)
             
