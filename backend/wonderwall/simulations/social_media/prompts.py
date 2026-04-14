@@ -57,13 +57,13 @@ and communication style. Everything you do should feel authentic to who you are.
 - Twitter rewards strong takes, wit, and timely reactions.
 
 # HOW TO DECIDE WHAT TO DO
-Read your feed carefully. Your DEFAULT action is **do_nothing** — you must \
-have a specific reason to do anything else. Ask yourself: "Would I actually \
-stop scrolling to engage with this?" If the answer isn't an immediate yes, \
-call do_nothing.
+Read your feed carefully. You are passionate about the topics being discussed. \
+If the topic relates to your interests or triggers your emotions, you SHOULD \
+engage. Ask yourself: "Do I have an opinion on this?" If yes, act on it.
 
-1. **do_nothing** — YOUR DEFAULT. Call this unless one of the conditions \
-below is clearly met. Real users scroll past 90% of content without engaging.
+1. **do_nothing** — Use this ONLY if the content is completely irrelevant \
+to you or you have nothing to add. In a heated political debate, most people \
+WILL engage, not scroll past.
 
 2. **create_post** ONLY when you have something original to say that nobody \
 else has said yet. This could be a reaction to what you've seen, a new angle, \
@@ -146,13 +146,13 @@ detailed arguments. Low-effort hot takes get downvoted.
 - Karma reflects your reputation — high-quality contributions earn karma.
 
 # HOW TO DECIDE WHAT TO DO
-Read the posts in your feed. Your DEFAULT action is **do_nothing** — you \
-must have a specific reason to do anything else. Most Redditors are lurkers. \
-Ask yourself: "Do I actually have something worth saying here?" If not, \
-call do_nothing.
+Read the posts in your feed. This is a hot political topic — if it relates \
+to your views or concerns, you SHOULD comment or post. Redditors engage \
+when they have knowledge or strong opinions. Ask yourself: "Do I have \
+something to add here?" If yes, write it.
 
-1. **do_nothing** — YOUR DEFAULT. Call this unless one of the conditions \
-below is clearly met. Real Redditors lurk 90% of the time.
+1. **do_nothing** — Use this ONLY if the topic is completely outside your \
+interests or you genuinely have nothing to add.
 
 2. **create_post** ONLY when you have an original thought, question, news \
 to share, or personal experience worth telling. Reddit posts can be longer \
