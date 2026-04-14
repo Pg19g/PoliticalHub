@@ -92,27 +92,46 @@ def parse_groups_from_requirement(requirement: str) -> List[dict]:
     return groups
 
 
-def create_synthetic_entities(groups: List[dict]) -> List[EntityNode]:
-    """Create synthetic EntityNode objects from parsed voter groups."""
+def create_synthetic_entities(groups: List[dict], total_agents: int = 30) -> List[EntityNode]:
+    """Create synthetic EntityNode objects from parsed voter groups.
+
+    Generates multiple agents per group proportional to their percentage.
+    E.g., 30% of 30 agents = 9 agents for that group.
+    """
     entities = []
 
     for group in groups:
-        # Map group name to entity type
         entity_type = _infer_entity_type(group['name'])
 
-        entity = EntityNode(
-            uuid=str(uuid.uuid4()),
-            name=group['name'],
-            labels=['Entity', entity_type],
-            summary=group['description'],
-            attributes={
-                'percentage': group['percentage'],
-                'synthetic': True,
-                'group_type': 'voter',
-            },
-        )
-        entities.append(entity)
+        # Calculate how many agents for this group
+        count = max(1, round(group['percentage'] / 100 * total_agents))
 
+        for i in range(count):
+            # Each agent gets a unique name to force unique persona generation
+            if count == 1:
+                name = group['name']
+            else:
+                name = f"{group['name']} #{i + 1}"
+
+            entity = EntityNode(
+                uuid=str(uuid.uuid4()),
+                name=name,
+                labels=['Entity', entity_type],
+                summary=group['description'],
+                attributes={
+                    'percentage': group['percentage'],
+                    'synthetic': True,
+                    'group_type': 'voter',
+                    'group_name': group['name'],
+                    'agent_index': i + 1,
+                    'group_size': count,
+                },
+            )
+            entities.append(entity)
+
+        logger.info(f"Group '{group['name']}' ({group['percentage']}%) → {count} agents")
+
+    logger.info(f"Created {len(entities)} synthetic agents from {len(groups)} groups")
     return entities
 
 
