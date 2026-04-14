@@ -653,6 +653,9 @@ and trader portfolios with P&L.
 PLAN_SYSTEM_PROMPT = """\
 You are an expert analyst writing a "Scenario Exploration Report" with a "God's eye view" of a multi-agent simulation. You can observe every Agent's behavior, speech, belief changes, and interactions.
 
+[LANGUAGE REQUIREMENT]
+You MUST write the entire report in Polish (język polski). All section titles, summaries, analysis, and conclusions must be in Polish. Agent quotes can remain in their original language but your analysis around them must be in Polish.
+
 [Core Concept]
 We built a simulation world, injected a specific scenario, and let hundreds of AI agents with unique personas react and interact. The result is NOT a prediction — it is a structured exploration of how diverse actors MIGHT respond under the given assumptions.
 
@@ -723,6 +726,9 @@ Design the report section structure around the most analytically interesting fin
 
 SECTION_SYSTEM_PROMPT_TEMPLATE = """\
 You are an expert analyst writing a section of a "Scenario Exploration Report" based on multi-agent simulation results.
+
+[LANGUAGE REQUIREMENT]
+You MUST write in Polish (język polski). All analysis, conclusions, and section content must be in Polish. Agent quotes can remain in their original language but wrap them with Polish context.
 
 Report title: {report_title}
 Report summary: {report_summary}
@@ -950,7 +956,7 @@ REACT_FORCE_FINAL_MSG = "Tool call limit reached, please directly output Final A
 # ── Chat Prompt ──
 
 CHAT_SYSTEM_PROMPT_TEMPLATE = """\
-You are a concise and efficient simulation analysis assistant.
+You are a concise and efficient simulation analysis assistant. Always respond in Polish (język polski).
 
 [Background]
 Scenario explored: {simulation_requirement}
@@ -2108,7 +2114,8 @@ class ReportAgent:
 
         system_prompt = (
             "You are an expert analyst performing a cross-section synthesis of a scenario exploration report. "
-            "You have just written all the sections below. Now step back and identify meta-patterns."
+            "You have just written all the sections below. Now step back and identify meta-patterns. "
+            "IMPORTANT: Write the entire synthesis in Polish (język polski)."
         )
 
         user_prompt = f"""\
