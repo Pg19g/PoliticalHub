@@ -113,16 +113,29 @@ def create_synthetic_entities(groups: List[dict], total_agents: int = 30) -> Lis
             else:
                 name = f"{group['name']} #{i + 1}"
 
+            # Build explicit summary so persona generator knows WHO this agent is
+            party = _extract_party_from_name(group['name'])
+            if party:
+                summary = (f"WAŻNE: Ta osoba jest WYBORCĄ i ZWOLENNIKIEM partii {party}. "
+                           f"POPIERA politykę {party} i BRONI jej stanowiska w dyskusjach. "
+                           f"Krytykuje partie opozycyjne. {group['description']}")
+            elif 'niezdecydow' in group['name'].lower():
+                summary = ("Ta osoba jest niezdecydowana politycznie. Nie popiera żadnej partii. "
+                           "Ocenia propozycje pragmatycznie, bez lojalności partyjnej.")
+            else:
+                summary = group['description']
+
             entity = EntityNode(
                 uuid=str(uuid.uuid4()),
                 name=name,
                 labels=['Entity', entity_type],
-                summary=group['description'],
+                summary=summary,
                 attributes={
                     'percentage': group['percentage'],
                     'synthetic': True,
                     'group_type': 'voter',
                     'group_name': group['name'],
+                    'party_affinity': party or '',
                     'agent_index': i + 1,
                     'group_size': count,
                 },
@@ -133,6 +146,24 @@ def create_synthetic_entities(groups: List[dict], total_agents: int = 30) -> Lis
 
     logger.info(f"Created {len(entities)} synthetic agents from {len(groups)} groups")
     return entities
+
+
+def _extract_party_from_name(group_name: str) -> str:
+    """Extract party name from group name like 'wyborcy KO' -> 'KO'."""
+    name_lower = group_name.lower()
+    parties = {
+        'ko': 'KO (Koalicja Obywatelska)',
+        'pis': 'PiS (Prawo i Sprawiedliwość)',
+        'konfederac': 'Konfederacja',
+        'lewic': 'Lewica',
+        'trzeci': 'Trzecia Droga',
+        'psl': 'PSL',
+        'polska 2050': 'Polska 2050',
+    }
+    for key, party in parties.items():
+        if key in name_lower:
+            return party
+    return ''
 
 
 def _infer_entity_type(group_name: str) -> str:
