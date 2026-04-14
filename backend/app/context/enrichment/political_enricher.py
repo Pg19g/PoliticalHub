@@ -114,41 +114,45 @@ class PoliticalEnricher:
             except Exception as e:
                 logger.warning(f"Persona lookup failed: {e}")
 
-        # Assemble context text
+        # Assemble COMPACT context text (~300 tokens max to control simulation cost)
+        # Full context goes in result dict for report/analysis, but context_text
+        # is what gets injected into agent persona (repeated every round)
         parts = []
 
+        # News: just 2 headlines, no full titles
         if result['recent_news']:
-            parts.append("### Najnowsze wiadomości (kontekst bieżący)\n" +
-                         "\n".join(f"- {n}" for n in result['recent_news']))
+            parts.append("Kontekst: " + "; ".join(n.split("] ")[-1][:60] for n in result['recent_news'][:2]))
 
+        # Polls: one line
         if result['polls']:
-            polls_str = ", ".join(f"{k}: {v}%" for k, v in result['polls'].items())
-            parts.append(f"### Aktualne sondaże\n{polls_str}")
+            top3 = list(result['polls'].items())[:3]
+            parts.append("Sondaże: " + ", ".join(f"{k} {v}%" for k, v in top3))
 
-        if result['party_stances']:
-            stance_lines = []
-            for s in result['party_stances'][:10]:
-                stance_lines.append(f"- {s['party_name']}: {s['vote']} ({s['cnt']}x)")
-            parts.append("### Głosowania partii w temacie\n" + "\n".join(stance_lines))
-
-        if politician_info:
-            parts.append(f"### Profil polityka\n"
-                         f"- {politician_info['name']} ({politician_info.get('party', '?')})\n"
-                         f"- Rola: {politician_info.get('role', 'poseł')}")
-
+        # Politician persona: ONLY communication style + 2 phrases (not full JSON)
         if persona_text:
-            parts.append(persona_text)
+            # Extract just first 2 lines of persona (style + phrases)
+            persona_lines = persona_text.strip().split("\n")[:3]
+            parts.append("\n".join(persona_lines))
 
-        # 6. Voter archetype — communication style from data, not LLM training
+        # Voter archetype: COMPACT version — style + 2 example posts only
         try:
-            from ..data.voter_archetypes import get_archetype_for_entity_type, format_archetype_for_prompt
+            from ..data.voter_archetypes import get_archetype_for_entity_type
             archetype = get_archetype_for_entity_type(entity_type, entity_name)
             if archetype:
-                parts.append(format_archetype_for_prompt(archetype))
+                comm = archetype["communication_profile"]
+                examples = archetype.get("example_posts", [])[:1]
+                parts.append(
+                    f"Styl: {comm['style']} (agresja:{comm['aggression']}/10)"
+                )
+                if examples:
+                    parts.append(f'Przykład: "{examples[0][:120]}"')
+                triggers = archetype.get("political_triggers", [])[:3]
+                if triggers:
+                    parts.append(f"Triggery: {', '.join(triggers)}")
         except Exception as e:
             logger.debug(f"Archetype lookup skipped: {e}")
 
-        result['context_text'] = "\n\n".join(parts)
+        result['context_text'] = "\n".join(parts)
 
         # Cache
         if self.redis and result['context_text']:
