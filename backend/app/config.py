@@ -65,7 +65,7 @@ class Config:
     DEFAULT_CHUNK_OVERLAP = 50  # Default overlap size
     
     # Wonderwall simulation configuration
-    WONDERWALL_DEFAULT_MAX_ROUNDS = int(os.environ.get('WONDERWALL_DEFAULT_MAX_ROUNDS', '10'))
+    WONDERWALL_DEFAULT_MAX_ROUNDS = int(os.environ.get('WONDERWALL_DEFAULT_MAX_ROUNDS', '20'))
     WONDERWALL_SIMULATION_DATA_DIR = os.path.join(os.path.dirname(__file__), '../uploads/simulations')
 
     # Wonderwall platform available actions configuration

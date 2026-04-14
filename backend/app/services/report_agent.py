@@ -680,10 +680,15 @@ Design a report that answers these questions through ANALYSIS, not mere descript
 - If the simulation reveals something boring or expected, say so — then dig deeper
 
 [Section Count Limits]
-- Minimum 3 sections, maximum 5 sections
-- The LAST section should always be "Synthesis & Implications" — cross-cutting patterns, unresolved tensions, and what the simulation CANNOT answer
+- Minimum 4 sections, maximum 6 sections
+- The SECOND-TO-LAST section should be "Synthesis & Implications" — cross-cutting patterns, unresolved tensions, and what the simulation CANNOT answer
+- The LAST section MUST be "Rekomendacje Strategiczne" (Strategic Recommendations) — concrete, actionable advice for the decision-maker:
+  * What specific messaging changes would reduce backlash?
+  * Which voter groups should be addressed first and with what arguments?
+  * What is the optimal timing for communication?
+  * What counter-arguments should be prepared?
+  * What are the top 3 risks and how to mitigate them?
 - No sub-sections needed, each section should contain complete content directly
-- Section structure should be designed by you based on what's analytically interesting
 
 Please output the report outline in JSON format as follows:
 {
@@ -697,7 +702,7 @@ Please output the report outline in JSON format as follows:
     ]
 }
 
-Note: The sections array must have at least 3 and at most 5 elements! The last section MUST be a synthesis section."""
+Note: The sections array must have at least 4 and at most 6 elements! The second-to-last section MUST be a synthesis section. The last section MUST be 'Rekomendacje Strategiczne'."""
 
 PLAN_USER_PROMPT_TEMPLATE = """\
 [Scenario Setup]
@@ -720,7 +725,7 @@ Analyze this simulation from a "God's eye view":
 
 Design the report section structure around the most analytically interesting findings.
 
-[Reminder] Section count: minimum 3, maximum 5. Last section MUST be synthesis. Focus on non-obvious insights, not description."""
+[Reminder] Section count: minimum 4, maximum 6. Second-to-last section MUST be synthesis. Last section MUST be 'Rekomendacje Strategiczne' with concrete, actionable advice. Focus on non-obvious insights, not description."""
 
 # ── Section Generation Prompt ──
 
