@@ -188,6 +188,51 @@ def filter_non_actors(entities: List[EntityNode]) -> List[EntityNode]:
     return filtered
 
 
+def get_default_groups_from_polls() -> List[dict]:
+    """Build default voter groups from Neo4j poll data.
+
+    Returns groups proportional to actual polling numbers.
+    Falls back to hardcoded data if Neo4j is unavailable.
+    """
+    try:
+        from flask import current_app
+        enricher = current_app.extensions.get('political_enricher')
+        if enricher and enricher.neo4j:
+            polls = enricher.neo4j.get_polls()
+            if polls and sum(polls.values()) > 50:  # Sanity check
+                groups = []
+                for party, pct in polls.items():
+                    if pct and pct >= 3:  # Skip parties below 3%
+                        groups.append({
+                            'name': f'wyborcy {party}',
+                            'percentage': round(pct),
+                            'description': f'Wyborcy partii {party} ({pct}% poparcia wg sondaży)',
+                        })
+                # Add undecided voters
+                accounted = sum(g['percentage'] for g in groups)
+                if accounted < 95:
+                    groups.append({
+                        'name': 'niezdecydowani',
+                        'percentage': 100 - accounted,
+                        'description': 'Wyborcy niezdecydowani, bez preferencji partyjnej',
+                    })
+                logger.info(f"Default groups from Neo4j polls: {len(groups)} parties")
+                return groups
+    except Exception as e:
+        logger.debug(f"Could not load polls from Neo4j: {e}")
+
+    # Fallback: hardcoded approximate data (CBOS/IBRiS Q1 2026)
+    logger.info("Using hardcoded default poll distribution")
+    return [
+        {'name': 'wyborcy KO', 'percentage': 32, 'description': 'Wyborcy Koalicji Obywatelskiej (32%)'},
+        {'name': 'wyborcy PiS', 'percentage': 29, 'description': 'Wyborcy Prawa i Sprawiedliwości (29%)'},
+        {'name': 'wyborcy Konfederacji', 'percentage': 13, 'description': 'Wyborcy Konfederacji (13%)'},
+        {'name': 'wyborcy Trzeciej Drogi', 'percentage': 9, 'description': 'Wyborcy Trzeciej Drogi/PSL/Polska2050 (9%)'},
+        {'name': 'wyborcy Lewicy', 'percentage': 8, 'description': 'Wyborcy Lewicy (8%)'},
+        {'name': 'niezdecydowani', 'percentage': 9, 'description': 'Wyborcy niezdecydowani (9%)'},
+    ]
+
+
 def merge_entities_with_groups(
     ner_entities: List[EntityNode],
     requirement: str,
@@ -196,25 +241,24 @@ def merge_entities_with_groups(
     Main function: merge NER entities (filtered) with synthetic voter groups.
 
     1. Filter out non-actor NER entities (CBOS, ZUS, etc.)
-    2. Parse voter groups from requirement
+    2. Parse voter groups from requirement OR use default poll-based distribution
     3. Create synthetic entities for groups
     4. Merge: NER persons/parties + synthetic voter groups
     """
     # Step 1: Filter NER entities
     actors = filter_non_actors(ner_entities)
 
-    # Step 2: Parse groups from requirement
+    # Step 2: Parse groups from requirement, or use default distribution
     groups = parse_groups_from_requirement(requirement)
 
     if not groups:
-        logger.info("No voter groups found in requirement, using NER entities only")
-        return actors
+        logger.info("No voter groups in requirement — using default poll-based distribution")
+        groups = get_default_groups_from_polls()
 
     # Step 3: Create synthetic entities
     synthetic = create_synthetic_entities(groups)
 
     # Step 4: Merge (NER actors first, then synthetic groups)
-    # Avoid duplicates: if NER already has "Donald Tusk" and requirement has "politycy", keep both
     merged = actors + synthetic
 
     logger.info(f"Merged entity list: {len(actors)} NER actors + {len(synthetic)} voter groups = {len(merged)} total")

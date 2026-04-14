@@ -1,6 +1,6 @@
 """Context Worker admin endpoints — trigger ingestion jobs manually."""
 
-from flask import current_app, jsonify
+from flask import current_app, jsonify, request
 
 from . import context_bp
 
@@ -138,6 +138,31 @@ def trigger_personas():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@context_bp.route('/polls', methods=['GET'])
+def get_polls():
+    """Get current poll data from Neo4j."""
+    enricher = current_app.extensions.get('political_enricher')
+    if not enricher or not enricher.neo4j:
+        return jsonify({'error': 'Not initialized'}), 503
+    polls = enricher.neo4j.get_polls()
+    return jsonify({'polls': polls})
+
+
+@context_bp.route('/polls', methods=['POST'])
+def update_polls():
+    """Update poll percentages. Body: {"PiS": 29, "KO": 32, ...}"""
+    enricher = current_app.extensions.get('political_enricher')
+    if not enricher or not enricher.neo4j:
+        return jsonify({'error': 'Not initialized'}), 503
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'JSON body required with party: percentage pairs'}), 400
+
+    enricher.neo4j.update_polls(data)
+    return jsonify({'status': 'ok', 'updated': data})
 
 
 @context_bp.route('/trigger/wiki', methods=['POST'])
